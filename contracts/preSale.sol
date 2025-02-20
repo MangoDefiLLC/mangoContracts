@@ -1,70 +1,84 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract TokenPresale is Ownable {
-    IERC20 public token;
-    uint256 public tokenPrice; // Price per token in ETH (1 ETH = X tokens)
-    uint256 public totalRaised; // Total ETH raised
-    uint256 public constant MAX_ETH = 300 ether; // Hard cap
+contract Presale is Ownable {
+    IERC20 public immutable token;
+    IUniswapV2Router02 public uniswapRouter;
+    address public immutable weth;
 
-    bool public saleActive = true;
+    uint256 public constant TOTAL_PRESALE_TOKENS = 50_000_000_000 * 10**18; // 50B tokens
+    uint256 public tokensSold;
+    uint256 public constant MAX_ETH = 300 ether;
+    uint256 public totalEthRaised;
+
+    uint256 public constant STAGE1_PRICE = 0.00000625 ether; // 50% discount
+    uint256 public constant STAGE2_PRICE = 0.000009375 ether; // 25% discount
+    uint256 public constant STAGE3_PRICE = 0.0000125 ether; // Launch price
+
+    uint256 public constant STAGE1_LIMIT = 20_000_000_000 * 10**18; // 20B tokens
+    uint256 public constant STAGE2_LIMIT = 35_000_000_000 * 10**18; // 35B tokens
+
+    bool public presaleEnded = false;
 
     event TokensPurchased(address indexed buyer, uint256 ethAmount, uint256 tokenAmount);
-    event SaleStatusUpdated(bool status);
-    event Withdrawn(address indexed owner, uint256 amount);
+    event LiquidityAdded(uint256 tokenAmount, uint256 ethAmount);
 
-    constructor(address _token, uint256 _tokenPrice) Ownable() {
-        require(_token != address(0), "Invalid token address");
+    constructor(address _token, address _router, address _weth) {
         token = IERC20(_token);
-        tokenPrice = _tokenPrice;
+        uniswapRouter = IUniswapV2Router02(_router);
+        weth = _weth;
     }
 
-    // Buy tokens with ETH
     function buyTokens() external payable {
-        require(saleActive, "Sale is not active");
-        require(msg.value > 0, "Must send ETH");
-        require(totalRaised + msg.value <= MAX_ETH, "Hard cap reached");
+        require(!presaleEnded, "Presale ended");
+        require(msg.value > 0, "Send ETH to buy tokens");
+        require(totalEthRaised + msg.value <= MAX_ETH, "Exceeds max ETH limit");
 
-        uint256 tokensToReceive = msg.value * tokenPrice;
-        require(token.balanceOf(address(this)) >= tokensToReceive, "Not enough tokens in contract");
+        uint256 tokensToReceive;
+        if (tokensSold < STAGE1_LIMIT) {
+            tokensToReceive = msg.value / STAGE1_PRICE;
+        } else if (tokensSold < STAGE2_LIMIT) {
+            tokensToReceive = msg.value / STAGE2_PRICE;
+        } else {
+            tokensToReceive = msg.value / STAGE3_PRICE;
+        }
 
-        totalRaised += msg.value;
-        token.transfer(msg.sender, tokensToReceive);
+        require(tokensSold + tokensToReceive <= TOTAL_PRESALE_TOKENS, "Not enough tokens left");
+
+        tokensSold += tokensToReceive;
+        totalEthRaised += msg.value;
+
+        require(token.transfer(msg.sender, tokensToReceive), "Token transfer failed");
 
         emit TokensPurchased(msg.sender, msg.value, tokensToReceive);
     }
 
-    // Change token price (only owner)
-    function setTokenPrice(uint256 _newPrice) external onlyOwner {
-        require(_newPrice > 0, "Price must be greater than zero");
-        tokenPrice = _newPrice;
+    function endPresaleAndAddLiquidity() external onlyOwner {
+        require(!presaleEnded, "Presale already ended");
+
+        presaleEnded = true;
+
+        uint256 tokensForLiquidity = 40_000_000_000 * 10**18; // 40B tokens
+        uint256 ethForLiquidity = 600_000 ether; // 600k USDC worth in WETH
+
+        token.approve(address(uniswapRouter), tokensForLiquidity);
+
+        uniswapRouter.addLiquidityETH{value: ethForLiquidity}(
+            address(token),
+            tokensForLiquidity,
+            0,
+            0,
+            owner(),
+            block.timestamp + 300
+        );
+
+        emit LiquidityAdded(tokensForLiquidity, ethForLiquidity);
     }
 
-    // Enable or disable the sale (only owner)
-    function toggleSaleStatus() external onlyOwner {
-        saleActive = !saleActive;
-        emit SaleStatusUpdated(saleActive);
-    }
-
-    // Withdraw raised ETH (only owner)
-    function withdrawETH() external onlyOwner {
-        uint256 balance = address(this).balance;
-        require(balance > 0, "No ETH to withdraw");
-        payable(owner()).transfer(balance);
-        emit Withdrawn(owner(), balance);
-    }
-
-    // Withdraw remaining tokens (only owner)
-    function withdrawTokens() external onlyOwner {
-        uint256 contractBalance = token.balanceOf(address(this));
-        require(contractBalance > 0, "No tokens left");
-        token.transfer(owner(), contractBalance);
-    }
-
-    // Allow contract to receive ETH
     receive() external payable {
         buyTokens();
     }
