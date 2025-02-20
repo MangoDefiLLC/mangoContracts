@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
-import {MangoRouter00} from "../contracts/mangoRouter00.sol";
+import {MangoRouter01} from "../contracts/mangoRouter01.sol";
 import{IERC20} from '../contracts/interfaces/IERC20.sol';
 //import {IAllowanceTransfer} from '../permit2/src/interfaces/IAllowanceTransfer.sol';
 interface CheatCodes {
@@ -20,7 +20,7 @@ contract CounterTest is Test {
 
     function setUp() public {
         
-        mango = new MangoRouter00();
+        mango = new MangoRouter01();
         weth = 0x4200000000000000000000000000000000000006;
         cheatCodes = CheatCodes(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
         deal(address(this),1e18);
