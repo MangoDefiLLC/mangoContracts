@@ -8,7 +8,6 @@ interface IUniswapV2Router02 {
     function factory() external pure returns (address);
     function WETH() external pure returns (address);
 }
-
 contract MANGO_DEFI is ERC20, Ownable {
     uint256 public buyTax = 2; // 2%
     uint256 public sellTax = 3; // 3%
@@ -60,7 +59,6 @@ contract MANGO_DEFI is ERC20, Ownable {
         sellTax = _sellTax;
         emit TaxesUpdated(_buyTax, _sellTax);
     }
-
     function setTaxWallet(address _taxWallet) external onlyOwner {
         require(_taxWallet != address(0), "Tax wallet cannot be the zero address");
         taxWallet = _taxWallet;

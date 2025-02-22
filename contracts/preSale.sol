@@ -1,85 +1,110 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import{IERC20} from './interfaces/IERC20.sol';
+//import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+//import "@openzeppelin/contracts/access/Ownable.sol";
 
+/**
+SUpply  */
 contract Presale is Ownable {
-    IERC20 public immutable token;
-    IUniswapV2Router02 public uniswapRouter;
-    address public immutable weth;
+    address public immutable owner;
+    address public immutable token;
 
-    uint256 public constant TOTAL_PRESALE_TOKENS = 50_000_000_000 * 10**18; // 50B tokens
-    uint256 public tokensSold;
-    uint256 public constant MAX_ETH = 300 ether;
+    uint256 public constant TOTAL_PRESALE_TOKENS; // 60B tokens
+    uint256 public tokensSold; //track how many token are sold
+    //uint256 public constant MAX_ETH = 320 ether;
     uint256 public totalEthRaised;
 
-    uint256 public constant STAGE1_PRICE = 0.00000625 ether; // 50% discount
-    uint256 public constant STAGE2_PRICE = 0.000009375 ether; // 25% discount
-    uint256 public constant STAGE3_PRICE = 0.0000125 ether; // Launch price
+    uint256 public constant STAGE1_PRICE = 0.0000000054 ether; // phase 1 price $0.000014
+    uint256 public constant STAGE2_PRICE = 0.0000000068 ether; // phase 2 price  $0.000018
+    //stage 2 price is even with launch
+    //usdc price
+    uint256 public constant USDC_STAGE1_PRICE = 0.000014;
+    uint256 public constant USDC_STAGE2_PRICE = 0.000019;
+    //target price when uniswap launch $0.000018 around 0.0000000067 ether
 
-    uint256 public constant STAGE1_LIMIT = 20_000_000_000 * 10**18; // 20B tokens
-    uint256 public constant STAGE2_LIMIT = 35_000_000_000 * 10**18; // 35B tokens
+    uint256 public constant STAGE1_LIMIT = 13_500_000_000 * 10**18; // 13.5B tokens
+    uint256 public constant STAGE2_LIMIT = 13_500_000_000 * 10**18; // 13.5B tokens
 
     bool public presaleEnded = false;
 
     event TokensPurchased(address indexed buyer, uint256 ethAmount, uint256 tokenAmount);
-    event LiquidityAdded(uint256 tokenAmount, uint256 ethAmount);
+    event EthWithdrawn(uint256 amount);
+    event Deposit(address sender,uint256 amount);
 
-    constructor(address _token, address _router, address _weth) {
-        token = IERC20(_token);
-        uniswapRouter = IUniswapV2Router02(_router);
-        weth = _weth;
+    constructor(address _token) {
+        owner = msg.sender;
+        token = _token;
     }
 
-    function buyTokens() external payable {
+    function mangoDeposit(uint256 tokenAmount,address token) external {
+        require(msg.sender != owner);
+        if(TOTAL_PRESALE_TOKENS  >= 60_000_000_000 * 10**18 )revert('60 Billion cap on pre sale');
+        TOTAL_PRESALE_TOKENS += tokenAmount;
+        bool txS = IERC20(token).transferFrom(msg.sender,tokenAmount);
+        require(txS);
+        emit Desposit(msg.sender,tokenAmount);
+    }
+    function buy_token_with_usdc(address _usdc,uint256 amount)external returns(uint256 amount){
+        require(amount!=0,'amount cant be zero');
+
+
+    }
+    function buyTokens()public payable {
         require(!presaleEnded, "Presale ended");
         require(msg.value > 0, "Send ETH to buy tokens");
-        require(totalEthRaised + msg.value <= MAX_ETH, "Exceeds max ETH limit");
-
-        uint256 tokensToReceive;
-        if (tokensSold < STAGE1_LIMIT) {
-            tokensToReceive = msg.value / STAGE1_PRICE;
-        } else if (tokensSold < STAGE2_LIMIT) {
-            tokensToReceive = msg.value / STAGE2_PRICE;
-        } else {
-            tokensToReceive = msg.value / STAGE3_PRICE;
-        }
-
-        require(tokensSold + tokensToReceive <= TOTAL_PRESALE_TOKENS, "Not enough tokens left");
-
+        
+        uint256 tokensToReceive = getAmountOut(msg.value);//function to get tokens out
+        require(tokensToReceive != 0,"try sending less eth");
         tokensSold += tokensToReceive;
         totalEthRaised += msg.value;
 
         require(token.transfer(msg.sender, tokensToReceive), "Token transfer failed");
-
         emit TokensPurchased(msg.sender, msg.value, tokensToReceive);
     }
-
-    function endPresaleAndAddLiquidity() external onlyOwner {
-        require(!presaleEnded, "Presale already ended");
-
-        presaleEnded = true;
-
-        uint256 tokensForLiquidity = 40_000_000_000 * 10**18; // 40B tokens
-        uint256 ethForLiquidity = 600_000 ether; // 600k USDC worth in WETH
-
-        token.approve(address(uniswapRouter), tokensForLiquidity);
-
-        uniswapRouter.addLiquidityETH{value: ethForLiquidity}(
-            address(token),
-            tokensForLiquidity,
-            0,
-            0,
-            owner(),
-            block.timestamp + 300
-        );
-
-        emit LiquidityAdded(tokensForLiquidity, ethForLiquidity);
+    function getAmountOutETH(uint256 amount) public view returns(uint256 tokensToReceive){
+        //to get the expected amount out for the swap
+         if (tokensSold < STAGE1_LIMIT) {
+            tokensToReceive = amount / STAGE1_PRICE;
+        } else if (tokensSold < STAGE2_LIMIT){
+            tokensToReceive = amount / STAGE2_PRICE;
+        } else {
+            //if this returns 0 then user needs to send less tokens
+            tokensToReceive = 0;
+        }
     }
-
-    receive() external payable {
-        buyTokens();
+     function getAmountOutUSDC(uint256 amount) public view returns(uint256 tokensToReceive){
+         //to get the expected amount out for the swap
+         if (tokensSold < STAGE1_LIMIT) {
+            tokensToReceive = amount / USDC_STAGE1_PRICE;
+        } else if (tokensSold < STAGE2_LIMIT){
+            tokensToReceive = amount / USDC_STAGE2_PRICE ;
+        } else {
+            //if this returns 0 then user needs to send less tokens
+            tokensToReceive = 0;
+        }
     }
+    function withdrawEth() external returns (uint256 balance) {
+        require(msg.sender == owner);
+        balance = address(this).balance;
+        (bool success, ) = owner().call{value: balance}("");
+        require(success, "ETH transfer failed");
+        emit EthWithdrawn(msg.sender,balance); // Emit an event for transparency
+    }
+    //DEV: remember approving the contract before depositing
+    function depositTokens(uint256 amount,address token) external {
+        require(msg.sender == owner);
+        bool s = IERC20(token).transferFrom(msg.sender,amount);
+        require(s);
+        emit Deposit(amount);
+    }
+    function withdrawTokens(address _token)external returns(uint256 balance){
+            if(msg.sender != owner) revert();
+            balance = IERC20(token).balanceOf(address(this));
+            bool s = weth.transfer(owner,balance);
+            if(s != true) revert();
+        }
+
+    fallback() external payable{}
 }

@@ -23,7 +23,7 @@ interface ISwapRouter02 {
 }
 
 //@DEV this is the first version of the MAngo router
-contract MangoRouter01 {
+contract MangoRouter001 {
 
     address public owner;
     IUniswapV3Factory public immutable factoryV3;

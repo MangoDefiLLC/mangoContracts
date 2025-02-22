@@ -19,8 +19,8 @@ interface IRouterV2{
                 address to,
                 uint deadline
                 )
-                external
                 payable
+                external
                 returns (uint[] memory amounts);
         function swapExactTokensForTokens(
                 uint amountIn,

@@ -3,10 +3,10 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../contracts/preSale.sol";
-import "../contracts/interface/IERC20.sol";
+import "../contracts/interfaces/IERC20.sol";
 
 contract MockERC20 is ERC20 {
-    constructor(string memory name, string memory symbol) IERC20(name, symbol) {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {
         _mint(msg.sender, 100_000_000_000 * 10**18); // Mint 100B tokens
     }
 }
@@ -14,29 +14,24 @@ contract MockERC20 is ERC20 {
 contract PresaleTest is Test {
     Presale public presale;
     MockERC20 public token;
-    address public owner = address(0x123);
+    uint256 public TOTAL_PRESALE_TOKENS = 50_000_000_000 * 10**18;//50 billion
+    address public owner;
     address public buyer1 = address(0x456);
     address public buyer2 = address(0x789);
     address public uniswapRouter = address(0x999);
     address public weth = address(0x888);
 
-    uint256 public constant STAGE1_PRICE = 0.00000625 ether;
-    uint256 public constant STAGE2_PRICE = 0.000009375 ether;
-    uint256 public constant STAGE3_PRICE = 0.0000125 ether;
-
-    uint256 public constant STAGE1_LIMIT = 20_000_000_000 * 10**18;
-    uint256 public constant STAGE2_LIMIT = 35_000_000_000 * 10**18;
-    uint256 public constant TOTAL_PRESALE_TOKENS = 50_000_000_000 * 10**18;
 
     function setUp() public {
+        owner = msg.sender;
         vm.startPrank(owner);
         token = new MockERC20("TestToken", "TT");
-        presale = new Presale(address(token), uniswapRouter, weth);
+        presale = new Presale(address(token));
         vm.stopPrank();
-
         // Transfer presale tokens to the presale contract
-        vm.prank(owner);
-        token.transfer(address(presale), TOTAL_PRESALE_TOKENS);
+        //vm.prank(owner);
+        token.approve(address(this),TOTAL_PRESALE_TOKENS);//pre sale amount
+        token.transferFrom(address(this),TOTAL_PRESALE_TOKENS);
     }
 
     // Test buying tokens in Stage 1
