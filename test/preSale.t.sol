@@ -81,8 +81,8 @@ contract PresaleTest is Test {
 
         uint256 expectedTokens = 1 ether / STAGE2_PRICE;
         assertEq(token.balanceOf(buyer2), expectedTokens);
-        // assertEq(presale.tokensSold(), STAGE1_LIMIT + expectedTokens);
-        // assertEq(presale.totalEthRaised(), (STAGE1_LIMIT * STAGE1_PRICE) + 1 ether);
+        assertEq(presale.tokensSold(), STAGE1_LIMIT + expectedTokens);
+        assertEq(presale.totalEthRaised(), (STAGE1_LIMIT * STAGE1_PRICE) + 1 ether);
     }
     fallback() external payable{}
     /**
