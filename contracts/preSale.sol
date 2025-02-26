@@ -70,9 +70,9 @@ contract Presale {
         //to get the expected amount out for the swap
          if (tokensSold < STAGE1_LIMIT) {
             tokensToReceive = amount / STAGE1_PRICE;
-        } else if (tokensSold < STAGE2_LIMIT){
+        } else if (tokensSold < (STAGE1_LIMIT + STAGE2_LIMIT)){
             tokensToReceive = amount / STAGE2_PRICE;
-        }else if (tokensSold < STAGE3_LIMIT){
+        }else if (tokensSold < (STAGE1_LIMIT + STAGE2_LIMIT + STAGE3_LIMIT)){
             tokensToReceive = amount / STAGE3_PRICE;
         } else {
             //if this returns 0 then user needs to send less tokens
@@ -109,14 +109,13 @@ contract Presale {
     }
      */
     function withdrawETH() external returns (uint256 balance) {
-        require(msg.sender == owner);
-        balance = address(this).balance;
-        (bool success, ) = owner.call{value: balance}("");
+        require(msg.sender == owner,'not owner');
+        (bool success, ) = owner.call{value: totalEthRaised}("");
         require(success, "ETH transfer failed");
-        emit EthWithdrawn(msg.sender,balance); // Emit an event for transparency
+        emit EthWithdrawn(msg.sender,totalEthRaised); // Emit an event for transparency
     }
     function withdrawTokens(address _token)external returns(uint256 balance){
-            if(msg.sender != owner) revert();
+            if(msg.sender != owner) revert('not owner');
             balance = IERC20(_token).balanceOf(address(this));
             bool s = IERC20(_token).transfer(owner,balance);
             if(s != true) revert();
