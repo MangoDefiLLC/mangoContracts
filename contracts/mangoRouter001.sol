@@ -109,7 +109,8 @@ contract MangoRouter001 {
     function tokensToEthV2(address token, uint256 amountIn) payable external returns(uint256 amountToPay) {
         if(amountIn == 0) revert();
         bool s = IERC20(token).transferFrom(msg.sender,address(this),amountIn);
-        if(s != true) revert('token transfer failed');
+        bool sucs = IERC20(token).approve(address(routerV2),amountIn);
+        if(s != true || sucs != true) revert('token transfer failed');
         address[] memory path = new address[](2);
         path[1] = address(weth);
         path[0] = token;

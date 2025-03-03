@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-/** 
+
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
@@ -11,7 +11,7 @@ interface CheatCodes {
  }
 contract CounterTest is Test {
     CheatCodes public cheatCodes;
-    MangoRouter00 public mango;
+    MangoRouter001 public mango;
     //IAllowanceTransfer public permit2;
     address public loaner;
 
@@ -21,7 +21,7 @@ contract CounterTest is Test {
 
     function setUp() public {
         
-        mango = new MangoRouter01();
+        mango = new MangoRouter001();
         weth = 0x4200000000000000000000000000000000000006;
         cheatCodes = CheatCodes(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
         deal(address(this),1e18);
@@ -36,7 +36,15 @@ contract CounterTest is Test {
         IERC20(brett).approve(address(this),type(uint256).max);
         bool s = IERC20(brett).transferFrom(loaner,address(this),balance);
         require(s);        
-    } 
+    }
+    function test_tokensToEth()public{
+        console.log('eth balance before swap',address(this).balance);
+        uint256 brettBalance = IERC20(brett).balanceOf(address(this));
+        console.log(brettBalance);
+        IERC20(brett).approve(address(mango),brettBalance);
+        mango.tokensToEthV2(brett,IERC20(brett).balanceOf(address(this)));
+    }
+    /** 
     function test_swapEthtoTokensv3() public {
         console.log('eth balance before swap',address(this).balance);
         console.log('brettAmount before swzap',IERC20(brett).balanceOf(address(this)));
@@ -105,7 +113,7 @@ contract CounterTest is Test {
     }
     function test_changeOwner() public {
         
-    }
+    } */
     fallback() external payable{}
+   
 }
-*/
