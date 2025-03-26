@@ -38,11 +38,12 @@ contract CounterTest is Test {
         require(s);        
     }
     function test_tokensToEth()public{
-        console.log('eth balance before swap',address(this).balance);
+        console.log('brett balance before swap', IERC20(brett).balanceOf(address(this)));
         uint256 brettBalance = IERC20(brett).balanceOf(address(this));
         console.log(brettBalance);
         IERC20(brett).approve(address(mango),brettBalance);
         mango.tokensToEthV2(brett,IERC20(brett).balanceOf(address(this)));
+        console.log('brett balance after swap', IERC20(brett).balanceOf(address(this)));
     }
     /** 
     function test_swapEthtoTokensv3() public {
