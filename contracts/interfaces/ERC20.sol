@@ -31,10 +31,10 @@ abstract contract ERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
 
     mapping(address account => mapping(address spender => uint256)) private _allowances;
 
-    uint256 private _totalSupply;
+    uint256 private _totalSupply = 100000000000e18;
 
-    string private _name;
-    string private _symbol;
+    string public _name;
+    string public _symbol;
 
     /**
      * @dev Sets the values for {name} and {symbol}.
@@ -163,7 +163,7 @@ abstract contract ERC20 is Context, IERC20, IERC20Metadata, IERC20Errors {
      *
      * NOTE: This function is not virtual, {_update} should be overridden instead.
      */
-    function _transfer(address from, address to, uint256 value) internal {
+    function _transfer(address from, address to, uint256 value) virtual internal {
         if (from == address(0)) {
             revert ERC20InvalidSender(address(0));
         }

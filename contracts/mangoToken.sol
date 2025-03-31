@@ -75,7 +75,7 @@ contract MANGO_DEFI is ERC20 {
     }
 
     function setTaxes(uint256 _buyTax, uint256 _sellTax) external onlyOwner {
-        require(_buyTax <= 5 && _sellTax <= 5, "Max tax is 5%");
+        require(_buyTax <= 3 && _sellTax <= 3, "Max tax is 3%");
         buyTax = _buyTax;
         sellTax = _sellTax;
         emit TaxesUpdated(_buyTax, _sellTax);
