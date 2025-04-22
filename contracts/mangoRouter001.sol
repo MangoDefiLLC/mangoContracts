@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 //import {IUniversalRouter} from './interfaces/IUniversalRouter.sol';
 import{IERC20} from './interfaces/IERC20.sol';
 import{IRouterV2} from './interfaces/IRouterV2.sol';
+import{IWETH9} from './interfaces/IWETH9.sol';
 import {IUniswapV3Factory } from './interfaces/IUniswapV3Factory.sol';
 
 interface ISwapRouter02 {
@@ -29,7 +30,7 @@ contract MangoRouter001 {
     IUniswapV3Factory public immutable factoryV3;
     ISwapRouter02 public immutable swapRouter02;
     IRouterV2 public immutable routerV2;
-    IERC20 public immutable weth;
+    IWETH9 public immutable weth;
     IERC20 public immutable usdc;
     uint24 public fee;
 
@@ -39,7 +40,7 @@ contract MangoRouter001 {
         owner = msg.sender;
         factoryV3 = IUniswapV3Factory(0x33128a8fC17869897dcE68Ed026d694621f6FDfD);
         routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);
-        weth = IERC20(0x4200000000000000000000000000000000000006);//0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);//base weth 0x4200000000000000000000000000000000000006
+        weth = IWETH9(0x4200000000000000000000000000000000000006);//0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);//base weth 0x4200000000000000000000000000000000000006
         usdc = IERC20(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
         swapRouter02 = ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
         fee = 300;
@@ -66,12 +67,16 @@ contract MangoRouter001 {
             //call swap 
             result = swapRouter02.exactInputSingle{value:amountIn}(params);
     }
+    function _findPath(token0,token1) private returns(address){
+
+    }
     //sell usdc for Weth in v3 pool
     function tokensForTokensV3(address token0, address token1, uint256 _amountToSell,uint24 _fee) public returns(uint256 result){
         if(_amountToSell == 0) revert();
         //tranfers token to this contract
         IERC20(token0).transferFrom(msg.sender,address(this),_amountToSell);
         uint256 _amountIn;
+    
         token0 == address(usdc) ? 
             _amountIn = _tax(_amountToSell): 
             _amountIn = _amountToSell;
@@ -90,6 +95,31 @@ contract MangoRouter001 {
                 });
             //call swap 
             result = swapRouter02.exactInputSingle(params);
+    }
+     //sell usdc for Weth in v3 pool
+    function tokensForEthV3(address token0, uint256 amountToSell,uint24 _fee) public returns(uint256 amountOut){
+        if(amountToSell == 0) revert();
+        //tranfers token to this contract
+        IERC20(token0).transferFrom(msg.sender,address(this),amountToSell);
+        uint256 _amountIn;
+       
+        bool s = IERC20(token0).approve(address(swapRouter02),amountToSell);
+        if(s != true) revert();
+    
+            ISwapRouter02.ExactInputSingleParams memory params = ISwapRouter02
+                .ExactInputSingleParams({
+                    tokenIn: address(token0), //token to swap
+                    tokenOut: address(weth), //token in return
+                    fee: _fee,//poolFee
+                    recipient:address(this), //reciever of the output token
+                    amountIn: amountToSell,// amont of input token you want to swap
+                    amountOutMinimum: 0, //set to zero in this case
+                    sqrtPriceLimitX96: 0 //set to zero
+                });
+            //call swap 
+            amountOut = swapRouter02.exactInputSingle(params);
+            //unwrap eth
+            if(weth.transfer(msg.sender,amountOut) != true) revert('weth unwrapping failed');
     }
 
     function ethToTokensV2(address token) payable public returns(uint[] memory amounts) {
