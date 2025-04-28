@@ -33,13 +33,22 @@ contract MangoRouter001 {
     IRouterV2 public immutable routerV2;
     IWETH9 public immutable weth;
     address public taxMan;
+    event Here(bool);
+    event Swap(address swaper,
+        address token0, 
+        address token1,
+        uint amountOut);
    
     uint24[] public poolFees;
     uint24 public taxFee;
     struct Path {
-        address poolAddress;
-        uint24 poolFee;
+        address token0;
+        address token1;
+        uint256 amount;
+        uint24 poolFee;// gas to be 0 to swap on v2
+        address receiver;
     }
+    event PATH(Path);
 
     event NewOwner(address newOner);
     constructor(){
@@ -49,7 +58,8 @@ contract MangoRouter001 {
         routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);
         weth = IWETH9(0x4200000000000000000000000000000000000006);
         swapRouter02 = ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
-        taxFee = 300;
+        //0x2626664c2603336E57B271c5C0b26F421741e481
+        taxFee = 300;//%3 in basis points
         poolFees = [10000,3000,5000];
         taxMan = owner;
     }
@@ -65,129 +75,126 @@ contract MangoRouter001 {
         (bool _s,) = taxMan.call{value:amount}("");
         if(_s != true) revert();
     }
-    function swap(address token0, address token1,uint256 amount) external payable returns(uint amountOut){
-        if(msg.value == 0 && amount == 0) revert('both cant be zero');
-        if(token0 == address(0) && msg.value != 0){
-            //swapping eth for token
-            //amount has to be 0
-            //token0 has to be 0 address
-            Path memory data = findPath(address(weth),token1);
-            //if fee is 0 then call v2
-            //eth is token 0 i take fee in eth
-            //collect fee the swap
-            uint toSwap = _tax(msg.value);
-            uint256 toTaxMan = msg.value - toSwap;
-            _payTaxMan(toTaxMan);
-            if(data.poolFee == 0){
-                
-                amountOut = _ethToTokensV2(token1,toSwap);
-            }else{
-                amountOut = ethToTokensV3(token1,data.poolFee);
-            }
+    function _swap(Path memory data) private returns(uint256 amountOut){
+       
+        if(data.token0 == address(0)){//eth to token 
+            //swapping eth to token
+            data.token0 = address(weth);
+            amountOut = data.poolFee == 0 ? _ethToTokensV2(data.token1,data.amount) : tokensToTokensV3(data);
+            emit Swap(msg.sender,data.token0,data.token1,amountOut);
 
-        }else if(token0 != address(0) && token1 == address(0) && amount != 0){
-            //swapping token to eth
-            Path memory data = findPath(token0,address(weth));
-            if(data.poolFee == 0){
-                //eth is token 0 i take fee in eth
-                //collect fee the swap
-                amountOut = tokensToEthV2(token0,amount);
-                uint tax = _tax(amountOut);
-                uint256 toTaxMan = amountOut - tax;
-                _payTaxMan(toTaxMan);
-            }
+        }else if(data.token1 == address(0)){//token to eth 
+            data.token1 = address(weth);
+            data.amount = data.amount;
+            data.receiver = address(this);
+            amountOut = data.poolFee == 0 ? _tokensToEthV2(data) : tokensToTokensV3(data);
+            emit PATH(data);
 
+            //UNWRAP ETH AFTER TOKPEN TO TOKEN SWAP
+            weth.withdraw(amountOut);
+            //tax and pay taxman
+            uint256 toUser = _tax(amountOut);
+            (bool s,) = msg.sender.call{value:toUser}("");
+            if(s != true) revert();
+            _payTaxMan(amountOut - toUser);
+
+            emit Swap(msg.sender,data.token0,data.token1,amountOut);
+
+
+        }else if(data.token0 > address(0) && data.token1 > address(0)){//token to token
+        //WE HAVE A TOKEN TO ETH ON V3 POOL
+         revert('swap2');
+        //THAT MEANS WE HAVE TO SWAP TOKEN TO TOKENS
+        //THEN UNWRAP THE WETH COLLECT FEE AND PAY USER
+
+        }else{
+            revert('nothing');
         }
     }
-    function ethToTokensV3(address token, uint24 poolFee) public payable returns(uint256 result){
-        if(poolFee == 0) revert();
-        if(msg.value == 0) revert();
-        uint256 amountIn = _tax(msg.value);
+    function swapTokensForTokensV2(Path memory data)public returns(uint256){
+    //     function swapExactTokensForTokens( 
+    //     uint amountIn,
+    //     uint amountOutMin,
+    //     address[] calldata path,
+    //     address to,
+    //     uint deadline
+    // ) external returns (uint[] memory amounts);
+    }
+      function swap(address token0, address token1,uint256 amount) external payable returns(uint amountOut){
+        if(msg.value == 0 && amount == 0) revert('both AMOUNTS cant be zero');
+        if(msg.value > 0 && amount > 0) revert('both AMOUNTS cant be bigger than 0');
+        if(token0 == address(0) && token1 == address(0)) revert('both cant be address(0)');
+     
+        Path memory path;
+        
+        path.amount =  msg.value == 0 ? amount : _tax(msg.value);
+         if(msg.value > 0){
+                _payTaxMan(msg.value - path.amount);
+         }
+        path.token0 = token0;
+        path.token1 = token1;
+
+        address pair = factoryV2.getPair(
+                token0  == address(0) ? address(weth):token0,
+                token1 == address(0) ? address(weth) : token1
+                );
+
+        if(pair>address(0)){//v2 pool exist
+            //IF AMOUNT IS 0, THEN IT WILL BE TAKEN AS ETH TO TOKEN
+            //IF AMOUNT != 0 THEN IT WILL BE TAKEN AS IF TOKEN0 IS A ERC20 
+            amountOut = _swap(path);
+        }
+
+        if(pair == address(0)){//find the v3 pool
+             bool found;
+            for(uint256 i = 0;i<poolFees.length;i++){
+                address _pair = factoryV3.getPool(
+                    token0  == address(0) ? address(weth):token0,
+                    token1 == address(0) ? address(weth) : token1,
+                    poolFees[i]
+                );
+                if(_pair > address(0)){
+                    path.poolFee = poolFees[i];
+                    found = true;
+                    break;
+                }
+            }
+            if(found){
+                emit PATH(path);
+                _swap(path);
+            } else {
+                revert("no V2 or V3 pool found");
+            }
+        }
+    }
+    
+    function tokensToTokensV3(Path memory data) public payable returns(uint256 result){
+        if(msg.value == 0){
+            require(IERC20(data.token0).approve(address(swapRouter02),data.amount),'approve failed');
+            require(IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount), 'tranfer failed');
+        }
+
+      
         //check this function
         ISwapRouter02.ExactInputSingleParams memory params = ISwapRouter02
             .ExactInputSingleParams({
-                tokenIn: address(weth), //token to swap
-                tokenOut: address(token), //token in return
-                fee: poolFee,//poolFee
-                recipient: msg.sender, //reciever of the output token
-                amountIn: amountIn,// amont of input token you want to swap
+                tokenIn: data.token0, //token to swap
+                tokenOut: data.token1, //token in return
+                fee: data.poolFee,//poolFee
+                recipient: data.receiver, //reciever of the output token
+                amountIn: data.amount,// amont of input token you want to swap
                 amountOutMinimum: 0, //set to zero in this case
                 sqrtPriceLimitX96: 0 //set to zero
             });
             //call swap 
-            result = swapRouter02.exactInputSingle{value:amountIn}(params);
-    }
-    function findPath(address token0,address token1) public returns(Path memory){
-        //check v2 pair
-        /**
-            NOTE
-            ADD STRUCT TO RETURN ADDRESS OF POOL
-            IF V3 SWAP ADD FEE, ELSE UST SLOT IT WITH 0 */
-        Path memory path;
-        address pair = factoryV2.getPair(token0,token1);
-        if(pair == address(0)){
-            for(uint256 i = 0;i<poolFees.length;i++){
-                address _pair = factoryV3.getPool(
-                    token0,
-                    token1,
-                    poolFees[i]
-                );
-                if(_pair != address(0)){
-                    
-                    return Path(_pair,poolFees[i]);
-                }
+            if(msg.value > 0){
+                result = swapRouter02.exactInputSingle{value:data.amount}(params);
+            }else{
+                result = swapRouter02.exactInputSingle(params);
             }
-
-        }else{
-            return Path(pair,0);
-        }
-    }
-    //sell usdc for Weth in v3 pool
-    function tokensForTokensV3(address token0, address token1, uint256 amountToSell,uint24 _fee) public returns(uint256 result){
-        if(amountToSell == 0) revert();
-        //tranfers token to this contract
-        IERC20(token0).transferFrom(msg.sender,address(this),amountToSell);
-        bool s = IERC20(token0).approve(address(swapRouter02),amountToSell);
-        if(s != true) revert();
-    
-            ISwapRouter02.ExactInputSingleParams memory params = ISwapRouter02
-                .ExactInputSingleParams({
-                    tokenIn: address(token0), //token to swap
-                    tokenOut: address(token1), //token in return
-                    fee: _fee,//poolFee
-                    recipient: msg.sender, //reciever of the output token
-                    amountIn: amountToSell,// amont of input token you want to swap
-                    amountOutMinimum: 0, //set to zero in this case
-                    sqrtPriceLimitX96: 0 //set to zero
-                });
-            //call swap 
-            result = swapRouter02.exactInputSingle(params);
     }
      //sell usdc for Weth in v3 pool
-    function tokensForEthV3(address token0, uint256 amountToSell,uint24 _fee) public returns(uint256 amountOut){
-        if(amountToSell == 0) revert();
-        //tranfers token to this contract
-        IERC20(token0).transferFrom(msg.sender,address(this),amountToSell);
-        uint256 _amountIn;
-       
-        bool s = IERC20(token0).approve(address(swapRouter02),amountToSell);
-        if(s != true) revert();
-    
-            ISwapRouter02.ExactInputSingleParams memory params = ISwapRouter02
-                .ExactInputSingleParams({
-                    tokenIn: address(token0), //token to swap
-                    tokenOut: address(weth), //token in return
-                    fee: _fee,//poolFee
-                    recipient:address(this), //reciever of the output token
-                    amountIn: amountToSell,// amont of input token you want to swap
-                    amountOutMinimum: 0, //set to zero in this case
-                    sqrtPriceLimitX96: 0 //set to zero
-                });
-            //call swap 
-            amountOut = swapRouter02.exactInputSingle(params);
-            //unwrap eth
-            if(weth.transfer(msg.sender,amountOut) != true) revert('weth unwrapping failed');
-    }
+
     //DEV
     //this is a modifies version of the swapv2 
     //to collect eth on the way in on swap function
@@ -206,37 +213,25 @@ contract MangoRouter001 {
         );
         return amounts[1];//amount out of the swap
     }
-    function tokensToEthV2(address token, uint256 amountIn) public returns(uint256) {
-        if(amountIn == 0) revert();
-        bool s = IERC20(token).transferFrom(msg.sender,address(this),amountIn);
-        bool sucs = IERC20(token).approve(address(routerV2),amountIn);
+   
+    function _tokensToEthV2(Path memory data) private returns(uint256) {
+        bool s = IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount);
+        bool sucs = IERC20(data.token0).approve(address(routerV2),data.amount);
         //if(s != true || sucs != true) revert('token transfer failed');
         address[] memory path = new address[](2);
-        path[1] = address(weth);
-        path[0] = token;
-        uint256[] memory amountOut = routerV2.getAmountsOut(amountIn,path);
+        path[1] = data.token1;
+        path[0] = data.token0;
+        uint256[] memory amountOut = routerV2.getAmountsOut(data.amount,path);
         uint256[] memory amounts = routerV2.swapExactTokensForETH(
-            amountIn,
+            data.amount,
             amountOut[1],
             path,
-            address(this),
+            data.receiver,
             block.timestamp + 200
             );
         return amounts[1];
     }
-   
-    function withdrawEth()external returns(uint256 balance){
-        if(msg.sender != owner) revert();
-        balance = address(this).balance;
-        (bool s,) = owner.call{value:balance}("");
-        require(s);
-    }
-    function withdrawTokens(address token)external returns(uint256 balance){
-        if(msg.sender != owner) revert();
-        balance = IERC20(token).balanceOf(address(this));
-        bool s = weth.transfer(owner,balance);
-        if(s != true) revert();
-    }
+
     function changeOwner(address newOwner) external {
         if(msg.sender != owner) revert();
         owner = newOwner;
