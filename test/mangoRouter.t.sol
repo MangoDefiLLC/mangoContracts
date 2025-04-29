@@ -122,15 +122,12 @@ contract CounterTest is Test {
         uint256 usdcB0 = IERC20(usdc).balanceOf(address(this));
         console.log('bret before',brettB0);
         IERC20(brett).approve(address(mango),brettB0);
-
         mango.swap(brett,usdc,brettB0);
-
         uint256 brettB1 = IERC20(brett).balanceOf(address(this));
         uint256 usdcB1 = IERC20(usdc).balanceOf(address(this));
         console.log('bret before',brettB0);
         assertNotEq(usdcB0,usdcB1,'usdc amount aqueal after swap');
         assertNotEq(brettB0,brettB1,'brett amount aqueal after swap');
-
     }
     function test_expectRevert_both_zero_address() public{
         
