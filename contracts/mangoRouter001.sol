@@ -80,6 +80,7 @@ contract MangoRouter001 {
         if(data.token0 == address(0)){//eth to token 
             //swapping eth to token
             data.token0 = address(weth);
+            data.receiver = msg.sender;
             amountOut = data.poolFee == 0 ? _ethToTokensV2(data.token1,data.amount) : tokensToTokensV3(data);
             emit Swap(msg.sender,data.token0,data.token1,amountOut);
 
