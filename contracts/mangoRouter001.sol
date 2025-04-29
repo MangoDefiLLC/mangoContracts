@@ -104,23 +104,31 @@ contract MangoRouter001 {
 
 
         }else if(data.token0 > address(0) && data.token1 > address(0)){//token to token
-        //WE HAVE A TOKEN TO ETH ON V3 POOL
-         revert('swap2');
-        //THAT MEANS WE HAVE TO SWAP TOKEN TO TOKENS
-        //THEN UNWRAP THE WETH COLLECT FEE AND PAY USER
+            //ADD TAX TO TOKENS TO TOKEN TRANSACTIONS
+            data.receiver = msg.sender;
+            amountOut = data.poolFee == 0 ? tokensToTokensV2(data) : tokensToTokensV3(data);
+            emit Swap(msg.sender,data.token0,data.token1,amountOut);
 
         }else{
-            revert('nothing');
+            revert('uncharted terrain');
         }
     }
-    function swapTokensForTokensV2(Path memory data)public returns(uint256){
-    //     function swapExactTokensForTokens( 
-    //     uint amountIn,
-    //     uint amountOutMin,
-    //     address[] calldata path,
-    //     address to,
-    //     uint deadline
-    // ) external returns (uint[] memory amounts);
+    function tokensToTokensV2(Path memory data)public returns(uint256){
+        require(IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount));
+        require(IERC20(data.token0).approve(address(routerV2),data.amount));
+         address[] memory path = new address[](2);
+        path[0] = data.token0;
+        path[1] = data.token1;
+        uint256[] memory amountsOut = routerV2.getAmountsOut(data.amount,path);
+        //swap
+        uint256[] memory amount = routerV2.swapExactTokensForTokens(
+            data.amount,
+            amountsOut[1],
+            path,
+            data.receiver,
+            block.timestamp*200
+        );
+        return amount[1];
     }
       function swap(address token0, address token1,uint256 amount) external payable returns(uint amountOut){
         if(msg.value == 0 && amount == 0) revert('both AMOUNTS cant be zero');
@@ -137,10 +145,9 @@ contract MangoRouter001 {
          }
         path.token0 = token0;
         path.token1 = token1;
-
         address pair = factoryV2.getPair(
-                token0  == address(0) ? address(weth):token0,
-                token1 == address(0) ? address(weth) : token1
+                path.token0 == address(0) ? address(weth):token0,
+                path.token1 == address(0) ? address(weth) : token1
                 );
 
         if(pair>address(0)){//v2 pool exist
