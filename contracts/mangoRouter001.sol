@@ -89,10 +89,11 @@ contract MangoRouter001 {
             data.amount = data.amount;
             data.receiver = address(this);
             amountOut = data.poolFee == 0 ? _tokensToEthV2(data) : tokensToTokensV3(data);
-            emit PATH(data);
 
             //UNWRAP ETH AFTER TOKPEN TO TOKEN SWAP
-            weth.withdraw(amountOut);
+            if(data.poolFee > 0){
+                 weth.withdraw(amountOut);
+            }
             //tax and pay taxman
             uint256 toUser = _tax(amountOut);
             (bool s,) = msg.sender.call{value:toUser}("");
@@ -124,6 +125,8 @@ contract MangoRouter001 {
       function swap(address token0, address token1,uint256 amount) external payable returns(uint amountOut){
         if(msg.value == 0 && amount == 0) revert('both AMOUNTS cant be zero');
         if(msg.value > 0 && amount > 0) revert('both AMOUNTS cant be bigger than 0');
+        if(token0 == address(0) && msg.value == 0) revert('token0 is address 0 , msg.value cant be 0');
+        if(token1 == address(0) && amount == 0) revert('token1 is address zero, amount cant be zero');
         if(token0 == address(0) && token1 == address(0)) revert('both cant be address(0)');
      
         Path memory path;
