@@ -129,6 +129,18 @@ contract CounterTest is Test {
         assertNotEq(usdcB0,usdcB1,'usdc amount aqueal after swap');
         assertNotEq(brettB0,brettB1,'brett amount aqueal after swap');
     }
+    function test_tokenToTokenV3() public{
+        uint256 wethB0 = IERC20(weth).balanceOf(address(this));
+        uint256 cointentB0 = IERC20(cointent).balanceOf(address(this));
+        console.log('cointent before',cointentB0);
+        IERC20(cointent).approve(address(mango),cointentB0);
+        mango.swap(cointent,weth,cointentB0);
+        uint256 wethB1 = IERC20(weth).balanceOf(address(this));
+        uint256 cointentB1 = IERC20(cointent).balanceOf(address(this));
+        console.log('cointent after',cointentB0);
+        assertNotEq(cointentB0,cointentB1,'usdc amount aqueal after swap');
+        assertNotEq(wethB0,wethB1,'brett amount aqueal after swap');
+    }
     function test_expectRevert_both_zero_address() public{
         
         mango.swap{value:1e18}(address(0),address(0),0);

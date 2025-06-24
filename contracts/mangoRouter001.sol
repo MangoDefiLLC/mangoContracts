@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 //import {IUniversalRouter} from './interfaces/IUniversalRouter.sol';
-import{IERC20} from './interfaces/IERC20.sol';
-import{IRouterV2} from './interfaces/IRouterV2.sol';
-import{IWETH9} from './interfaces/IWETH9.sol';
+
+import {IRouterV2} from './interfaces/IRouterV2.sol';
+import {IWETH9} from './interfaces/IWETH9.sol';
+import {IERC20} from './interfaces/IERC20.sol';
 import {IUniswapV3Factory } from './interfaces/IUniswapV3Factory.sol';
 import {IUniswapV2Factory } from './interfaces/IUniswapV2Factory.sol';
+import {MangoReferral} from "./mangoReferral.sol";
+
 interface ISwapRouter02 {
     struct ExactInputSingleParams {
         address tokenIn;
@@ -29,26 +32,30 @@ contract MangoRouter001 {
     address public owner;
     IUniswapV2Factory public immutable factoryV2;
     IUniswapV3Factory public immutable factoryV3;
+    MangoReferral public immutable mangoReferal;
     ISwapRouter02 public immutable swapRouter02;
     IRouterV2 public immutable routerV2;
     IWETH9 public immutable weth;
     address public taxMan;
-    event Here(bool);
-    event Swap(address swaper,
-        address token0, 
-        address token1,
-        uint amountOut);
-   
-    uint24[] public poolFees;
-    uint24 public taxFee;
+    uint256 public  referralFee;
+
     struct Path {
         address token0;
         address token1;
         uint256 amount;
         uint24 poolFee;// gas to be 0 to swap on v2
         address receiver;
+        address referrer;
     }
+
+    event Swap(address swaper,
+        address token0, 
+        address token1,
+        uint amountOut);
     event PATH(Path);
+   
+    uint24[] public poolFees;
+    uint24 public taxFee;
 
     event NewOwner(address newOner);
     constructor(){
@@ -56,11 +63,13 @@ contract MangoRouter001 {
         factoryV2 = IUniswapV2Factory(0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6);
         factoryV3 = IUniswapV3Factory(0x33128a8fC17869897dcE68Ed026d694621f6FDfD);
         routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);
-        weth = IWETH9(0x4200000000000000000000000000000000000006);
-        swapRouter02 = ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
+        weth = IWETH9(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
+        swapRouter02 = ISwapRouter02(0x1b81D678ffb9C0263b24A97847620C99d213eB14);
+        mangoReferal = new MangoReferral(msg.sender);
         //0x2626664c2603336E57B271c5C0b26F421741e481
         taxFee = 300;//%3 in basis points
-        poolFees = [10000,3000,5000];
+        referralFee = 100;//1% in basis points
+        poolFees = [10000,20000,2500,1000,100,3000,5000];
         taxMan = owner;
     }
     function changeTaxMan(address newTaxMan) external {
@@ -69,7 +78,10 @@ contract MangoRouter001 {
     }
     function _tax(uint256 _amount) private view returns(uint256 amount){
         uint256 taxAmount = _amount * taxFee / 10000;
-        amount = _amount - taxAmount;
+        amount = _amount - taxAmount;//amount is the amount to user de rest is the fee
+    }
+     function _referalFee(uint256 amount) private returns(uint256 referalPay){//this amount is the 3% for taxMan
+        uint256 referalPay = amount * referralFee / 1000;
     }
     function _payTaxMan(uint256 amount) private {
         (bool _s,) = taxMan.call{value:amount}("");
@@ -130,24 +142,26 @@ contract MangoRouter001 {
         );
         return amount[1];
     }
-      function swap(address token0, address token1,uint256 amount) external payable returns(uint amountOut){
+    function swap(address token0, address token1,uint256 amount,address referrer) external payable returns(uint amountOut){
         if(msg.value == 0 && amount == 0) revert('both AMOUNTS cant be zero');
         if(msg.value > 0 && amount > 0) revert('both AMOUNTS cant be bigger than 0');
         if(token0 == address(0) && msg.value == 0) revert('token0 is address 0 , msg.value cant be 0');
         if(token1 == address(0) && amount == 0) revert('token1 is address zero, amount cant be zero');
         if(token0 == address(0) && token1 == address(0)) revert('both cant be address(0)');
-     
+
+        //CHECK IF SWAPPER IS A REFERRE
+        //IF TRUE THEN TAKE THE 1% OF THE 3%
+        //ELSE SWAP NORMALLY
+    
         Path memory path;
         
         path.amount =  msg.value == 0 ? amount : _tax(msg.value);
-         if(msg.value > 0){
-                _payTaxMan(msg.value - path.amount);
-         }
         path.token0 = token0;
         path.token1 = token1;
+        path.referrer = mangoReferal.referralChain(msg.sender);//if address 0 then user has no referrer
         address pair = factoryV2.getPair(
-                path.token0 == address(0) ? address(weth):token0,
-                path.token1 == address(0) ? address(weth) : token1
+                token0 == address(0) ? address(weth):token0,
+                token1 == address(0) ? address(weth) : token1
                 );
 
         if(pair>address(0)){//v2 pool exist
@@ -172,11 +186,23 @@ contract MangoRouter001 {
             }
             if(found){
                 emit PATH(path);
-                _swap(path);
+                amountOut = _swap(path);
             } else {
+                //ADD CHECK AERO AND PANCAKE
                 revert("no V2 or V3 pool found");
             }
         }
+        if(msg.value > 0){
+            uint256 totalPayOut = msg.value - path.amount;
+            if(path.referrer != address(0)){
+                uint256 referalPay = _referalFee(totalPayOut);
+                 //distributeReferralRewards()
+                _payTaxMan(totalPayOut-referalPay);
+            }else{
+                _payTaxMan(totalPayOut);
+            }
+                
+         }
     }
     
     function tokensToTokensV3(Path memory data) public payable returns(uint256 result){
@@ -253,6 +279,7 @@ contract MangoRouter001 {
         require(newFee<600);//less than 5%
         taxFee = newFee;
     }
+    //function updateReferalContract()
     fallback() external payable{}
 
 }
