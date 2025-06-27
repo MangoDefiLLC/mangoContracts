@@ -5,7 +5,7 @@ pragma solidity ^0.8.13;
 import {IERC20} from './interfaces/IERC20.sol';
 //@DEV
 //THIS CONTRACT IS DESIGNE SO DISTRIBUTE THE FEE TO THE REFERRERS
-//IT RECIVES ETH OR WETH THEN DISTRIBUTES THE AMOUNTS IN $MANGO
+//DISTRIBUTES THE AMOUNTS IN $MANGO
 //NOTE: ADD THAT IF OTHER TOKENS IS SENDT IS ABLE TO SWAP IT TO WETH
 //@ADD:  RQUIRE MSG.SENDER IS MANGO ROUTER
 //NOTE THE AMOUNT THAT IS SENT TO THIS CONTRACT IS ALREADY THE 1% 
@@ -14,6 +14,7 @@ contract MangoReferral {
 
      address public owner;
      IERC20 public mangoToken;
+     bool public presaleEnded;
      mapping(address=>bool) public  mangoRouters;//to ensure call is comming from routers
      mapping(address=>uint256) public lifeTimeEarnings;
      mapping(address=>address) public referralChain;// address => referrerAddress
@@ -34,7 +35,7 @@ contract MangoReferral {
         uint256 amount;
     }
 
-     constructor(address _owner,address router){
+     constructor(address _owner,address router){//owner is dev wallet
          owner = _owner;
          mangoRouters[router] = true;
          //mangoToken = IERC20(_mangoToken);
@@ -49,6 +50,9 @@ contract MangoReferral {
         mangoRouters[router] = true;
 
     }
+    function getReferralChain(address swapper) external view returns (address){
+        return referralChain[swapper];//returns address(0) when has no referrer
+    }
     //THIS PRICE IN DETERMINED IN ETH OR WETH
     // SO THIS CONTRACT WILL RECIVES ETH OR WETH
     //TO GET MORE TOKENS IMPLEMENT SWAPPING TOKENS TO WETH
@@ -56,7 +60,11 @@ contract MangoReferral {
     function _getMangoAmountETH(
         uint256 amount
     ) private view returns (uint256 mangoTokensAmount) {
-        mangoTokensAmount = (amount / mangoPrice) * 10**18; // Fixed
+        if(presaleEnded == true){
+            //LOGIC TO GET PRICE FROM UNISWAPV2 POOL
+        }else{
+            mangoTokensAmount = (amount / mangoPrice) * 10**18; // Fixed
+        }
     }
     ///CREATE FUNCTION TO
     function distributeReferralRewards(
@@ -64,8 +72,8 @@ contract MangoReferral {
         uint256 inputAmount,//amount to distribute IF THIS AMOUNT IS NOT 0, SWAP TOKEN TO ETH
         address referrer// the referrer
     ) external payable {
-        //require(owners[msg.sender],'you aint him!');
         if(inputAmount == 0) revert('input cant be 0');
+        //require(mangoRouters[msg.sender],'only mango routers can call Distribution');
         //address referrer = referralChain[_referrer] ? ;
         uint256 mangoTokensAmount = _getMangoAmountETH(inputAmount);
         _buildReferralChainAndTransferRewards(
