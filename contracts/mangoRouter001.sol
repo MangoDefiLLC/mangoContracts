@@ -5,6 +5,7 @@ pragma solidity ^0.8.13;
 import {IRouterV2} from './interfaces/IRouterV2.sol';
 import {IWETH9} from './interfaces/IWETH9.sol';
 import {IERC20} from './interfaces/IERC20.sol';
+import {IMangoReferral} from './interfaces/IMangoReferral.sol';
 import {IUniswapV3Factory } from './interfaces/IUniswapV3Factory.sol';
 import {IUniswapV2Factory } from './interfaces/IUniswapV2Factory.sol';
 import {MangoReferral} from "./mangoReferral.sol";
@@ -32,7 +33,7 @@ contract MangoRouter001 {
     address public owner;
     IUniswapV2Factory public immutable factoryV2;
     IUniswapV3Factory public immutable factoryV3;
-    MangoReferral public immutable mangoReferal;
+    IMangoReferral public  mangoReferral;
     ISwapRouter02 public immutable swapRouter02;
     IRouterV2 public immutable routerV2;
     IWETH9 public immutable weth;
@@ -69,7 +70,6 @@ contract MangoRouter001 {
         // routerV2 = IRouterV2(0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3);
         weth = IWETH9(0x4200000000000000000000000000000000000006);// sepolia 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
         swapRouter02 = ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);//swapRouter02 = ISwapRouter02(0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E);
-        mangoReferal = new MangoReferral(owner,address(this));
         //0x2626664c2603336E57B271c5C0b26F421741e481
         taxFee = 300;//%3 in basis points
         referralFee = 100;//1% in basis points
@@ -84,7 +84,7 @@ contract MangoRouter001 {
         uint256 taxAmount = _amount * taxFee / 10000;
         amount = _amount - taxAmount;//amount is the amount to user de rest is the fee
     }
-     function _referalFee(uint256 amount) private returns(uint256 referalPay){//this amount is the 3% for taxMan
+     function _referalFee(uint256 amount) private view returns (uint256 referalPay){//this amount is the 3% for taxMan
         referalPay = amount * referralFee / 1000;
     }
     function _payTaxMan(uint256 amount) private {
@@ -201,7 +201,7 @@ contract MangoRouter001 {
             uint256 totalPayOut = msg.value - path.amount;
             if(path.referrer != address(0)){//user has a referer
                 uint256 referalPay = _referalFee(totalPayOut);
-                mangoReferal.distributeReferralRewards(msg.sender,referalPay,path.referrer);
+                mangoReferral.distributeReferralRewards(msg.sender,referalPay,path.referrer);
                 _payTaxMan(totalPayOut);
             }else{
                 _payTaxMan(totalPayOut);
@@ -257,8 +257,8 @@ contract MangoRouter001 {
     }
    
     function _tokensToEthV2(Path memory data) private returns(uint256) {
-        bool s = IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount);
-        bool sucs = IERC20(data.token0).approve(address(routerV2),data.amount);
+        require(IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount),'TF Failed!');
+        require(IERC20(data.token0).approve(address(routerV2),data.amount),'AP Failed!');
         //if(s != true || sucs != true) revert('token transfer failed');
         address[] memory path = new address[](2);
         path[1] = data.token1;
@@ -283,6 +283,10 @@ contract MangoRouter001 {
         require(msg.sender == owner);
         require(newFee<600);//less than 5%
         taxFee = newFee;
+    }
+    function setReferralContract(address referalAdd) external {
+        require(msg.sender == owner);
+        mangoReferral = IMangoReferral(referalAdd);
     }
     //function updateReferalContract()
     fallback() external payable{

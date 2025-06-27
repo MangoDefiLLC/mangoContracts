@@ -35,21 +35,12 @@ contract MangoReferral {
         uint256 amount;
     }
 
-     constructor(address _owner,address router){//owner is dev wallet
+     constructor(address _owner,address _mangoRouter, address _mangoToken){//owner is dev wallet
          owner = _owner;
-         mangoRouters[router] = true;
-         //mangoToken = IERC20(_mangoToken);
+         mangoRouters[_mangoRouter] = true;
+         mangoToken = IERC20(_mangoToken);
          mangoPrice = 11_390_000_000 wei;
      }
-    function addToken(address token) external {
-        require(msg.sender == owner);
-        mangoToken = IERC20(token);
-    }
-    function addRouter(address router) external {
-        require(msg.sender == owner);
-        mangoRouters[router] = true;
-
-    }
     function getReferralChain(address swapper) external view returns (address){
         return referralChain[swapper];//returns address(0) when has no referrer
     }
@@ -72,10 +63,10 @@ contract MangoReferral {
         uint256 inputAmount,//amount to distribute IF THIS AMOUNT IS NOT 0, SWAP TOKEN TO ETH
         address referrer// the referrer
     ) external payable {
-        if(inputAmount == 0) revert('input cant be 0');
-        //require(mangoRouters[msg.sender],'only mango routers can call Distribution');
+        require(mangoRouters[msg.sender],'only mango routers can call Distribution');
         //address referrer = referralChain[_referrer] ? ;
         uint256 mangoTokensAmount = _getMangoAmountETH(inputAmount);
+
         _buildReferralChainAndTransferRewards(
             userAddress,
             mangoTokensAmount,//Amount to distribute
@@ -103,7 +94,6 @@ contract MangoReferral {
             contractBalance > 0,
             "Insufficient contract mango tokens balance"
         );
-
         // Create array to track rewards (max 5 levels)
         ReferralReward[] memory rewards = new ReferralReward[](5);
         uint256 totalRewardsToDistribute = 0;
@@ -171,6 +161,19 @@ contract MangoReferral {
         require(msg.sender == owner);
         (bool s,) = owner.call{value:amount}("");
         require(s);
+    }
+    function addToken(address token) external {
+        require(msg.sender == owner);
+        mangoToken = IERC20(token);
+    }
+    function addRouter(address router) external {
+        require(msg.sender == owner);
+        mangoRouters[router] = true;
+
+    }
+    function depositeTokens(address token, uint256 amount) public {
+        require(msg.sender == owner || msg.sender == address(this),'not allowed to DP');
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
     }
     fallback() external {}
 }
