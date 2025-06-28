@@ -16,6 +16,7 @@ contract MangoReferral {
      address public owner;
      IERC20 public mangoToken;
      bool public presaleEnded;
+     address public weth;
      IRouterV2 public immutable routerV2;
      mapping(address=>bool) public  mangoRouters;//to ensure call is comming from routers
      mapping(address=>uint256) public lifeTimeEarnings;
@@ -43,6 +44,7 @@ contract MangoReferral {
          mangoToken = IERC20(_mangoToken);
          mangoPrice = 11_390_000_000 wei;
          routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);
+         weth = 0x4200000000000000000000000000000000000006;
      }
     function getReferralChain(address swapper) external view returns (address){
         return referralChain[swapper];//returns address(0) when has no referrer
@@ -56,10 +58,11 @@ contract MangoReferral {
     ) private view returns (uint256 mangoTokensAmount) {
         if(presaleEnded == true){
             //LOGIC TO GET PRICE FROM UNISWAPV2 POOL
+            //if presale ended
               address[] memory path = new address[](2);
-                path[0] = address(weth);
+                path[0] = weth;
                 path[1] = address(mangoToken);
-                uint256[] memory amountOut = routerV2.getAmountsOut(amountIn,path);
+                uint256[] memory amountOut = routerV2.getAmountsOut(amount,path);
                 mangoTokensAmount = amountOut[1];
         }else{
             mangoTokensAmount = (amount * 10**18) / mangoPrice; // Fixed
