@@ -3,6 +3,7 @@
 pragma solidity ^0.8.13;
 
 import {IERC20} from './interfaces/IERC20.sol';
+import {IRouterV2} from './interfaces/IRouterV2.sol';
 //@DEV
 //THIS CONTRACT IS DESIGNE SO DISTRIBUTE THE FEE TO THE REFERRERS
 //DISTRIBUTES THE AMOUNTS IN $MANGO
@@ -15,6 +16,7 @@ contract MangoReferral {
      address public owner;
      IERC20 public mangoToken;
      bool public presaleEnded;
+     IRouterV2 public immutable routerV2;
      mapping(address=>bool) public  mangoRouters;//to ensure call is comming from routers
      mapping(address=>uint256) public lifeTimeEarnings;
      mapping(address=>address) public referralChain;// address => referrerAddress
@@ -22,9 +24,9 @@ contract MangoReferral {
     // Level 1: 40% (4000 basis points)
     // Level 2: 25% (2500 basis points)
     // Level 3: 15% (1500 basis points)
-    // Level 4: 10% (1000 basis points)
+    // Level 4: 10% (1000 basis points). 
     // Level 5: 10% (1000 basis points)
-    uint256[5] public rewardPercentages = [4000, 2500, 1500, 1000, 1000];
+    uint256[5] public constant rewardPercentages = [4000, 2500, 1500, 1000, 1000];
     uint256 public mangoPrice;
 
     event DistributedAmount(uint256);
@@ -40,6 +42,7 @@ contract MangoReferral {
          mangoRouters[_mangoRouter] = true;
          mangoToken = IERC20(_mangoToken);
          mangoPrice = 11_390_000_000 wei;
+         routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);
      }
     function getReferralChain(address swapper) external view returns (address){
         return referralChain[swapper];//returns address(0) when has no referrer
@@ -53,8 +56,13 @@ contract MangoReferral {
     ) private view returns (uint256 mangoTokensAmount) {
         if(presaleEnded == true){
             //LOGIC TO GET PRICE FROM UNISWAPV2 POOL
+              address[] memory path = new address[](2);
+                path[0] = address(weth);
+                path[1] = address(mangoToken);
+                uint256[] memory amountOut = routerV2.getAmountsOut(amountIn,path);
+                mangoTokensAmount = amountOut[1];
         }else{
-            mangoTokensAmount = (amount / mangoPrice) * 10**18; // Fixed
+            mangoTokensAmount = (amount * 10**18) / mangoPrice; // Fixed
         }
     }
     ///CREATE FUNCTION TO

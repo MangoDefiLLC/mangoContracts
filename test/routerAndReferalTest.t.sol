@@ -129,6 +129,11 @@ contract test_Router_and_Referal is Test {
         uint256 testerBalance5 = IERC20(mangoToken).balanceOf(tester0);
         assertNotEq(testerBalance4,testerBalance5);
     }
+    function test_nonRouterCallDistribute_expectRevert() external {
+        vm.expectRevert("only mango routers can call Distribution");
+        vm.prank(add1);
+        mangoReferral.distributeReferralRewards(add1,1e18,tester0);
+    }
        // function test_SwapAndDistribute_floor1_ethToTOken() external{
     //     (bool s,) = add1.call{value:1e18}("");
     //     uint256 ethBalanceBeforeSwap = address(this).balance;
