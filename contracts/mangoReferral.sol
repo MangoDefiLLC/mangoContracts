@@ -27,7 +27,7 @@ contract MangoReferral {
     // Level 3: 15% (1500 basis points)
     // Level 4: 10% (1000 basis points). 
     // Level 5: 10% (1000 basis points)
-    uint256[5] public constant rewardPercentages = [4000, 2500, 1500, 1000, 1000];
+    uint256[5] public rewardPercentages = [4000, 2500, 1500, 1000, 1000];
     uint256 public mangoPrice;
 
     event DistributedAmount(uint256);
@@ -55,7 +55,7 @@ contract MangoReferral {
     //THEN PAYINGOUT 
     function _getMangoAmountETH(
         uint256 amount
-    ) private view returns (uint256 mangoTokensAmount) {
+    ) private  returns (uint256 mangoTokensAmount) {
         if(presaleEnded == true){
             //LOGIC TO GET PRICE FROM UNISWAPV2 POOL
             //if presale ended
