@@ -31,6 +31,7 @@ contract MangoReferral {
     uint256 public mangoPrice;
 
     event DistributedAmount(uint256);
+    event SetPrice(uint256);
 
     struct ReferralReward {
         address referrerAddress;
@@ -38,13 +39,13 @@ contract MangoReferral {
         uint256 amount;
     }
 
-     constructor(address _owner,address _mangoRouter, address _mangoToken){//owner is dev wallet
-         owner = _owner;
-         mangoRouters[_mangoRouter] = true;
-         mangoToken = IERC20(_mangoToken);
+     constructor(address _owner,address _mangoRouter, address _mangoToken){//owner is dev wallet 
+         owner = _owner; //0x49f2f071B1Ac90eD1DB1426EA01cA4C145c45d48;//
+         mangoRouters[_mangoRouter] = true;//0x9E1672614377bBfdafADD61fB3Aa1897586D0903
+         mangoToken = IERC20(_mangoToken);//0xdAbF530587e25f8cB30813CABA0C3CB1DA4f83D4
          mangoPrice = 11_390_000_000 wei;
-         routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);
-         weth = 0x4200000000000000000000000000000000000006;
+         routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);//0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24
+         weth =  0x4200000000000000000000000000000000000006;//0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
      }
     function getReferralChain(address swapper) external view returns (address){
         return referralChain[swapper];//returns address(0) when has no referrer
@@ -163,6 +164,11 @@ contract MangoReferral {
             emit DistributedAmount(totalRewardsToDistribute);
         }
         return rewards;
+    }
+    function setTokenPrice(uint256 price) external {
+        require(msg.sender == owner);
+        mangoPrice = price;
+        emit SetPrice(price);
     }
     function withDrawTokens(address token,uint256 amount) external{
         require(msg.sender == owner,'not owner');

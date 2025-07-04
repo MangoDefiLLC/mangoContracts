@@ -10,8 +10,8 @@ interface IUniswapV2Router02 {
 
 contract MANGO_DEFI is ERC20 {
     address public owner;
-    uint256 public buyTax = 0; // 2%
-    uint256 public sellTax = 0; // 3%
+    uint256 public buyTax = 2; // 2%
+    uint256 public sellTax = 3; // 3%
     address public uniswapRouter;
     address public taxWallet;
 
