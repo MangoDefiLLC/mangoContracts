@@ -18,6 +18,7 @@ contract MangoReferral {
      bool public presaleEnded;
      address public weth;
      IRouterV2 public immutable routerV2;
+
      mapping(address=>bool) public  mangoRouters;//to ensure call is comming from routers
      mapping(address=>uint256) public lifeTimeEarnings;
      mapping(address=>address) public referralChain;// address => referrerAddress
@@ -31,6 +32,7 @@ contract MangoReferral {
     uint256 public mangoPrice;
 
     event DistributedAmount(uint256);
+    event ReferralAdded(address evangelist,address beliver);
     event SetPrice(uint256);
 
     struct ReferralReward {
@@ -76,7 +78,6 @@ contract MangoReferral {
         address referrer// the referrer
     ) external payable {
         require(mangoRouters[msg.sender],'only mango routers can call Distribution');
-        //address referrer = referralChain[_referrer] ? ;
         uint256 mangoTokensAmount = _getMangoAmountETH(inputAmount);
 
         _buildReferralChainAndTransferRewards(
@@ -98,6 +99,7 @@ contract MangoReferral {
             referrer != userAddress
         ) {
             referralChain[userAddress] = referrer;
+            emit ReferralAdded(referrer,userAddress);
         }
         // Check contract's token balance
         uint256 contractBalance = mangoToken.balanceOf(address(this));

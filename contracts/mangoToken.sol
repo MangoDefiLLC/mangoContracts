@@ -10,59 +10,57 @@ interface IUniswapV2Router02 {
 
 contract MANGO_DEFI is ERC20 {
     address public owner;
-    uint256 public buyTax = 2; // 2%
-    uint256 public sellTax = 3; // 3%
-    address public uniswapRouter;
+    uint256 public buyTax = 200;  // 2% in basis points (BPS)
+    uint256 public sellTax = 300; // 3% in basis points (BPS)
+    address public uniswapRouterV2;
     address public taxWallet;
 
     mapping(address => bool) public isExcludedFromTax;
-    mapping(address => bool) public isPair; // Allows multiple pools (V2, V3, V4)
+    mapping(address => bool) public isPair;
 
     event TaxesUpdated(uint256 buyTax, uint256 sellTax);
     event TaxWalletUpdated(address newTaxWallet);
     event PairAdded(address pair);
-    event NewOwner(address _newOwner);
+    event NewOwner(address newOwner);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not authorized");
         _;
     }
 
-    constructor(address _router, address _taxWallet) ERC20("MANGO", "MANGO") {
+    constructor(address _router) ERC20("MANGO DEFI", "MANGO") {
+        uint256 initialSupply = 100_000_000_000e18;
+        _mint(msg.sender, initialSupply);
         owner = msg.sender;
-        _mint(owner, 100_000_000_000 * 10**decimals());
-        uniswapRouter = _router;
-        taxWallet = _taxWallet;
-
-        // Exclude key addresses from tax
+        taxWallet = msg.sender;
+        uniswapRouterV2 = _router;
         isExcludedFromTax[owner] = true;
         isExcludedFromTax[address(this)] = true;
-        isExcludedFromTax[_router] = true;
+        isExcludedFromTax[uniswapRouterV2] = true;
     }
 
     function addPair(address pair) external onlyOwner {
         require(pair != address(0), "Invalid pair address");
         isPair[pair] = true;
-        isExcludedFromTax[pair] = true;
         emit PairAdded(pair);
     }
-    function excludeAddress(address _contract) external  onlyOwner returns(bool){
-        require(msg.sender == owner);
-        // to be able to add new mango router versions
-        isExcludedFromTax[_contract] = true;
+
+    function excludeAddress(address _addr) external onlyOwner returns (bool) {
+        isExcludedFromTax[_addr] = true;
         return true;
     }
+
 
     function _transfer(address from, address to, uint256 amount) internal override {
         uint256 taxAmount = 0;
 
         if (!isExcludedFromTax[from] && !isExcludedFromTax[to]) {
             if (isPair[to]) {
-                // Selling
-                taxAmount = (amount * sellTax) / 100;
+                // Sell
+                taxAmount = (amount * sellTax) / 10000;
             } else if (isPair[from]) {
-                // Buying
-                taxAmount = (amount * buyTax) / 100;
+                // Buy
+                taxAmount = (amount * buyTax) / 10000;
             }
         }
 
@@ -75,19 +73,21 @@ contract MANGO_DEFI is ERC20 {
     }
 
     function setTaxes(uint256 _buyTax, uint256 _sellTax) external onlyOwner {
-        require(_buyTax <= 3 && _sellTax <= 3, "Max tax is 3%");
+        require(_buyTax <= 300 && _sellTax <= 300, "Max tax is 3%");
         buyTax = _buyTax;
         sellTax = _sellTax;
         emit TaxesUpdated(_buyTax, _sellTax);
     }
 
     function setTaxWallet(address _taxWallet) external onlyOwner {
-        require(_taxWallet != address(0), "Tax wallet cannot be zero address");
+        require(_taxWallet != address(0), "Zero address not allowed");
         taxWallet = _taxWallet;
         emit TaxWalletUpdated(_taxWallet);
     }
-    function changeOwner(address _newOwner) external onlyOwner{
+
+    function changeOwner(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Zero address not allowed");
         owner = _newOwner;
-        emit  NewOwner(owner);
+        emit NewOwner(_newOwner);
     }
 }

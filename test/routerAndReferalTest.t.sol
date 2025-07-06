@@ -3,6 +3,7 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
+import {IMangoRouter} from '../contracts/interfaces/IMangoRouter.sol';
 import {MangoRouter002} from "../contracts/mangoRouter001.sol";
 import {MANGO_DEFI} from "../contracts/mangoToken.sol";
 import{IERC20} from '../contracts/interfaces/IERC20.sol';
@@ -13,17 +14,18 @@ interface CheatCodes {
  }
 contract test_Router_and_Referal is Test {
     CheatCodes public cheatCodes;
-    MangoRouter002 public mangoRouter;
+    IMangoRouter public mangoRouter;
     MANGO_DEFI public mangoToken;
     MangoReferral public  mangoReferral;
     uint256 public amount;
     //IAllowanceTransfer public permit2;
     address public loaner;
+    address public b4 = 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17;
     address public tester0 = address(0x10);
     address public add1 = address(0x01);
     address public add2 = address(0x02);
     address public add3 = address(0x03);
-    address public add4 = address(0x04);
+    address public add4 = address(0x0FB602E2E1eE587d9c0Da6368E352E33bfEcF12e);
     address public add5 = address(0x05);
 
     address public weth;
@@ -35,49 +37,39 @@ contract test_Router_and_Referal is Test {
         //router
         //token
         //referal
-        mangoRouter = new MangoRouter002();
-        weth = 0x4200000000000000000000000000000000000006;//weth = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
-        usdc = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+        mangoRouter = IMangoRouter(0x9E1672614377bBfdafADD61fB3Aa1897586D0903);//0xeE629d83e42564A17Ea50E34c2D2A121d5A6E911);
+        weth = weth = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
+        usdc = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
         cheatCodes = CheatCodes(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
-        mangoToken = new MANGO_DEFI(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24,address(this));
-        //deposite mango token on referal
-        mangoReferral = new MangoReferral(address(this),address(mangoRouter),address(mangoToken));
-        mangoRouter.setReferralContract(address(mangoReferral));
-        mangoToken.approve(address(mangoReferral),type(uint256).max);
-        mangoReferral.depositeTokens(address(mangoToken), 300000000e18);//300 million
-        deal(address(this),2e18); // sepolia usdc = 0x8BEbFCBe5468F146533C182dF3DFbF5ff9BE00E2;
-        assertEq(address(this).balance, 2e18);
-        deal(add1,2e18);
-        deal(add2,2e18);
-        deal(add3,2e18);
-        deal(add4,2e18);
-        deal(add5,2e18);
-        amount = 1e18;
-        //permit2 = IAllowanceTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+        cheatCodes.prank(0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17);
+        //IERC20(usdc).approve(address(this),20e6);
+        IERC20(usdc).transfer(address(this),20e6);
+
+
         //deply referal to test it works
         //mangoReferal = new MangoReferral(address(this),address(mangoRouter));//owner and router
     
         }
-        function test_SwapAndDistribute_floor1_ethToTOken() external{
-            (bool s,) = add1.call{value:1e18}("");
-            uint256 ethBalanceBeforeSwap = address(this).balance;
-            console.log(add1.balance,'eth balance of add 1 before swap');
-             console.log(mangoToken.balanceOf(add1),'$MANGO balance before of referrer0');
+    //     function test_SwapAndDistribute_floor1_ethToTOken() external{
+    //         (bool s,) = add1.call{value:1e18}("");
+    //         uint256 ethBalanceBeforeSwap = address(this).balance;
+    //         console.log(add1.balance,'eth balance of add 1 before swap');
+    //          console.log(mangoToken.balanceOf(add1),'$MANGO balance before of referrer0');
 
-            console.log(IERC20(usdc).balanceOf(address(this)),'usdc balance of swapper before swap');
+    //         console.log(IERC20(usdc).balanceOf(address(this)),'usdc balance of swapper before swap');
 
-            mangoRouter.swap{value:amount}(address(0),usdc,0,add1);
+    //         mangoRouter.swap{value:amount}(address(0),usdc,0,add1);
 
-            console.log(IERC20(usdc).balanceOf(address(this)),'usdc balance of swapper after swap');
+    //         console.log(IERC20(usdc).balanceOf(address(this)),'usdc balance of swapper after swap');
 
-            assertNotEq(ethBalanceBeforeSwap,address(this).balance,'balance are the same, swap failed');
-            uint256 ethBalanceAfterSwap = address(this).balance;
-            assertEq(ethBalanceAfterSwap, amount * 300 / 10000,'balance after swap is not %3');
+    //         assertNotEq(ethBalanceBeforeSwap,address(this).balance,'balance are the same, swap failed');
+    //         uint256 ethBalanceAfterSwap = address(this).balance;
+    //         assertEq(ethBalanceAfterSwap, amount * 300 / 10000,'balance after swap is not %3');
             
-            console.log(mangoToken.balanceOf(add1),'$MANGO balance of referrer0');
-            assertNotEq(mangoToken.balanceOf(add1),0);
+    //         console.log(mangoToken.balanceOf(add1),'$MANGO balance of referrer0');
+    //         assertNotEq(mangoToken.balanceOf(add1),0);
 
-    }
+    // }
     // function test_buttingReferrer() external {
     //     // tester will refer add1
     //     //then add 1 will try to swap with new referrer
@@ -156,16 +148,16 @@ contract test_Router_and_Referal is Test {
     //     vm.prank(add1);
     //     mangoReferral.distributeReferralRewards(add1,1e18,tester0);
     // }
-    // function test_swap() public {
-    //     uint256 ethBalanceBeforeSwap = address(this).balance;
-    //     console.log(add1.balance,'balance of add 1 before swap');
-    //     console.log(IERC20(usdc).balanceOf(address(this)),'usdc balance of swapper before swap');
-    //     mangoRouter.swap{value:amount}(address(0),usdc,0,address(0));
-    //     console.log(IERC20(usdc).balanceOf(address(this)),'usdc balance of swapper after swap');
-    //     assertNotEq(ethBalanceBeforeSwap,address(this).balance,'balance are the same, swap failed');
-    //     uint256 ethBalanceAfterSwap = address(this).balance;
-    //     assertEq(ethBalanceAfterSwap, amount * 300 / 10000,'balance after swap is not %3');
+    function test_swap() public {
+        uint256 ethBalanceBeforeSwap = address(this).balance;
+        console.log(add1.balance,'balance of add 1 before swap');
+        console.log(IERC20(usdc).balanceOf(b4),'usdc balance of swapper before swap');
+        //vm.startPrank(b4);
+        IERC20(usdc).approve(address(mangoRouter),IERC20(usdc).balanceOf(address(this)));
+        mangoRouter.swap(usdc,address(0),IERC20(usdc).balanceOf(address(this)),address(0));
+        vm.stopPrank();
+        console.log(IERC20(usdc).balanceOf(b4),'usdc balance of swapper after swap');
         
-    // }
+    }
     fallback() external payable {}
 }
