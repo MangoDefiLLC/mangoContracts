@@ -8,9 +8,7 @@ import {IMangoReferral} from './interfaces/IMangoReferral.sol';
 contract Presale {
     address public immutable owner;
     address public immutable mango;
-    uint256 public immutable maxFunding = 337500000000000000000;
     IMangoReferral public mangoReferral;
-
 
     IERC20 public immutable weth;
     IERC20 public immutable usdc;
@@ -91,7 +89,7 @@ contract Presale {
         presaleEnded = true;
         return true;
     }
-    function setTokenPrice(uint256 newPrice) external {
+    function setPrice(uint256 newPrice) external {
         require(msg.sender == owner);
         PRICE = newPrice;
         emit PriceSet(PRICE);

@@ -53,7 +53,8 @@ contract MangoRouter002 {
         address token0, 
         address token1,
         uint amountOut);
-    event PATH(Path);
+
+    event ReferralPayout(uint256 amountToReferral);
    
     uint24[] public poolFees;
     uint24 public taxFee;
@@ -109,6 +110,8 @@ contract MangoRouter002 {
             data.receiver = address(this);
             amountOut = data.poolFee == 0 ? _tokensToEthV2(data) : tokensToTokensV3(data);
 
+            emit Swap(msg.sender,data.token0,data.token1,amountOut);
+
             //UNWRAP ETH AFTER TOKPEN TO TOKEN SWAP
             if(data.poolFee > 0){
                  weth.withdraw(amountOut);
@@ -117,10 +120,14 @@ contract MangoRouter002 {
             uint256 toUser = _tax(amountOut);
             (bool s,) = msg.sender.call{value:toUser}("");
             if(s != true) revert();
-            _payTaxMan(amountOut - toUser);
 
-            emit Swap(msg.sender,data.token0,data.token1,amountOut);
-
+            if(data.referrer > address(0)){
+                uint256 referalPay = _referalFee(toUser - amountOut);
+                mangoReferral.distributeReferralRewards(msg.sender,referalPay,data.referrer);
+                emit ReferralPayout(referalPay);
+            }else{
+                 _payTaxMan(amountOut - toUser);
+            }
 
         }else if(data.token0 > address(0) && data.token1 > address(0)){//token to token
             //ADD TAX TO TOKENS TO TOKEN TRANSACTIONS
@@ -192,7 +199,6 @@ contract MangoRouter002 {
                 }
             }
             if(found){
-                emit PATH(path);
                 amountOut = _swap(path);
             } else {
                 //ADD CHECK AERO AND PANCAKE
@@ -202,10 +208,14 @@ contract MangoRouter002 {
         if(msg.value > 0){
             //IF TOKEN 0 IS ETH
             uint256 totalPayOut = msg.value - path.amount;
-            if(path.referrer != address(0)){//user has a referer
-                uint256 referalPay = _referalFee(totalPayOut);
-                mangoReferral.distributeReferralRewards(msg.sender,referalPay,path.referrer);
+            if(path.referrer > address(0)){//user has a referer
+
+                uint256 referralPay = _referalFee(totalPayOut);
+                mangoReferral.distributeReferralRewards(msg.sender,referralPay,path.referrer);
+
+                emit ReferralPayout(referralPay);
                 _payTaxMan(totalPayOut);
+                
             }else{
                 _payTaxMan(totalPayOut);
             }
