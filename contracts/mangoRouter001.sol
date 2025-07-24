@@ -28,7 +28,7 @@ interface ISwapRouter02 {
 }
 
 //@DEV this is the first version of the MAngo router
-contract MangoRouter001 {
+contract MangoRouter002 {
 
     address public owner;
     IUniswapV2Factory public immutable factoryV2;
@@ -53,7 +53,8 @@ contract MangoRouter001 {
         address token0, 
         address token1,
         uint amountOut);
-    event PATH(Path);
+
+    event ReferralPayout(uint256 amountToReferral);
    
     uint24[] public poolFees;
     uint24 public taxFee;
@@ -64,12 +65,15 @@ contract MangoRouter001 {
         factoryV2 = IUniswapV2Factory(0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6);
         factoryV3 = IUniswapV3Factory(0x33128a8fC17869897dcE68Ed026d694621f6FDfD);
         routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);
+        swapRouter02 = ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
+        //ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
+        weth = IWETH9(0x4200000000000000000000000000000000000006);
         //sepolia
         // factoryV2 = IUniswapV2Factory(0xF62c03E08ada871A0bEb309762E260a7a6a880E6);
         // factoryV3 = IUniswapV3Factory(0x0227628f3F023bb0B980b67D528571c95c6DaC1c);
         // routerV2 = IRouterV2(0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3);
-        weth = IWETH9(0x4200000000000000000000000000000000000006);// sepolia 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
-        swapRouter02 = ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);//swapRouter02 = ISwapRouter02(0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E);
+        // weth = IWETH9(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);// sepolia 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
+        // swapRouter02 = ISwapRouter02(0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E);//ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
         //0x2626664c2603336E57B271c5C0b26F421741e481
         taxFee = 300;//%3 in basis points
         referralFee = 100;//1% in basis points
@@ -85,7 +89,7 @@ contract MangoRouter001 {
         amount = _amount - taxAmount;//amount is the amount to user de rest is the fee
     }
      function _referalFee(uint256 amount) private view returns (uint256 referalPay){//this amount is the 3% for taxMan
-        referalPay = amount * referralFee / 1000;
+        referalPay = (amount * referralFee + 9999) / 10000; 
     }
     function _payTaxMan(uint256 amount) private {
         (bool _s,) = taxMan.call{value:amount}("");
@@ -106,6 +110,8 @@ contract MangoRouter001 {
             data.receiver = address(this);
             amountOut = data.poolFee == 0 ? _tokensToEthV2(data) : tokensToTokensV3(data);
 
+            emit Swap(msg.sender,data.token0,data.token1,amountOut);
+
             //UNWRAP ETH AFTER TOKPEN TO TOKEN SWAP
             if(data.poolFee > 0){
                  weth.withdraw(amountOut);
@@ -114,10 +120,14 @@ contract MangoRouter001 {
             uint256 toUser = _tax(amountOut);
             (bool s,) = msg.sender.call{value:toUser}("");
             if(s != true) revert();
-            _payTaxMan(amountOut - toUser);
 
-            emit Swap(msg.sender,data.token0,data.token1,amountOut);
-
+            if(data.referrer > address(0)){
+                uint256 referalPay = _referalFee(toUser - amountOut);
+                mangoReferral.distributeReferralRewards(msg.sender,referalPay,data.referrer);
+                emit ReferralPayout(referalPay);
+            }else{
+                 _payTaxMan(amountOut - toUser);
+            }
 
         }else if(data.token0 > address(0) && data.token1 > address(0)){//token to token
             //ADD TAX TO TOKENS TO TOKEN TRANSACTIONS
@@ -162,7 +172,7 @@ contract MangoRouter001 {
         path.amount =  msg.value == 0 ? amount : _tax(msg.value);
         path.token0 = token0;
         path.token1 = token1;
-        path.referrer =  referrer;//if address 0 then user has no referrer
+        path.referrer =  referrer == address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
         address pair = factoryV2.getPair(
                 token0 == address(0) ? address(weth):token0,
                 token1 == address(0) ? address(weth) : token1
@@ -189,7 +199,6 @@ contract MangoRouter001 {
                 }
             }
             if(found){
-                emit PATH(path);
                 amountOut = _swap(path);
             } else {
                 //ADD CHECK AERO AND PANCAKE
@@ -199,10 +208,14 @@ contract MangoRouter001 {
         if(msg.value > 0){
             //IF TOKEN 0 IS ETH
             uint256 totalPayOut = msg.value - path.amount;
-            if(path.referrer != address(0)){//user has a referer
-                uint256 referalPay = _referalFee(totalPayOut);
-                mangoReferral.distributeReferralRewards(msg.sender,referalPay,path.referrer);
+            if(path.referrer > address(0)){//user has a referer
+
+                uint256 referralPay = _referalFee(totalPayOut);
+                mangoReferral.distributeReferralRewards(msg.sender,referralPay,path.referrer);
+
+                emit ReferralPayout(referralPay);
                 _payTaxMan(totalPayOut);
+
             }else{
                 _payTaxMan(totalPayOut);
             }
@@ -279,7 +292,7 @@ contract MangoRouter001 {
         owner = newOwner;
         emit NewOwner(newOwner);
     }
-    function changeFee(uint24 newFee) public returns (bool){
+    function changeFee(uint24 newFee) public {
         require(msg.sender == owner);
         require(newFee<600);//less than 5%
         taxFee = newFee;
@@ -289,7 +302,5 @@ contract MangoRouter001 {
         mangoReferral = IMangoReferral(referalAdd);
     }
     //function updateReferalContract()
-    fallback() external payable{
-        _payTaxMan(msg.value);
-    }
+    fallback() external payable{}
 }

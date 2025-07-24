@@ -18,6 +18,7 @@ contract MangoReferral {
      bool public presaleEnded;
      address public weth;
      IRouterV2 public immutable routerV2;
+
      mapping(address=>bool) public  mangoRouters;//to ensure call is comming from routers
      mapping(address=>uint256) public lifeTimeEarnings;
      mapping(address=>address) public referralChain;// address => referrerAddress
@@ -31,6 +32,8 @@ contract MangoReferral {
     uint256 public mangoPrice;
 
     event DistributedAmount(uint256);
+    event ReferralAdded(address evangelist,address beliver);
+    event SetPrice(uint256);
 
     struct ReferralReward {
         address referrerAddress;
@@ -38,13 +41,13 @@ contract MangoReferral {
         uint256 amount;
     }
 
-     constructor(address _owner,address _mangoRouter, address _mangoToken){//owner is dev wallet
-         owner = _owner;
-         mangoRouters[_mangoRouter] = true;
-         mangoToken = IERC20(_mangoToken);
+     constructor(){//owner is dev wallet 
+         owner = msg.sender; //0x49f2f071B1Ac90eD1DB1426EA01cA4C145c45d48;//
+         mangoRouters[0x23F498aB49aA5E24c23d51e225F710E138D0c1D0] = true;//0x9E1672614377bBfdafADD61fB3Aa1897586D0903
+         mangoToken = IERC20(0xe3A7bd1f7F0bdEEce9DBb1230E64FFf26cd2C8b6);//0xdAbF530587e25f8cB30813CABA0C3CB1DA4f83D4
          mangoPrice = 11_390_000_000 wei;
-         routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);
-         weth = 0x4200000000000000000000000000000000000006;
+         routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);//0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24
+         weth =  0x4200000000000000000000000000000000000006;//0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
      }
     function getReferralChain(address swapper) external view returns (address){
         return referralChain[swapper];//returns address(0) when has no referrer
@@ -75,7 +78,6 @@ contract MangoReferral {
         address referrer// the referrer
     ) external payable {
         require(mangoRouters[msg.sender],'only mango routers can call Distribution');
-        //address referrer = referralChain[_referrer] ? ;
         uint256 mangoTokensAmount = _getMangoAmountETH(inputAmount);
 
         _buildReferralChainAndTransferRewards(
@@ -97,6 +99,7 @@ contract MangoReferral {
             referrer != userAddress
         ) {
             referralChain[userAddress] = referrer;
+            emit ReferralAdded(referrer,userAddress);
         }
         // Check contract's token balance
         uint256 contractBalance = mangoToken.balanceOf(address(this));
@@ -163,6 +166,11 @@ contract MangoReferral {
             emit DistributedAmount(totalRewardsToDistribute);
         }
         return rewards;
+    }
+    function setTokenPrice(uint256 price) external {
+        require(msg.sender == owner);
+        mangoPrice = price;
+        emit SetPrice(price);
     }
     function withDrawTokens(address token,uint256 amount) external{
         require(msg.sender == owner,'not owner');
