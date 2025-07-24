@@ -24,12 +24,14 @@ contract Presale {
     event EthWithdrawn(address caller, uint256 amount);
     event Deposit(address sender, uint256 amount);
     event PriceSet(uint256);
+    event ReferralPayout(uint256);
 
-    constructor(address _token) {
+    constructor() {
         owner = msg.sender;
-        mango = _token;
-        weth = IERC20(0x4200000000000000000000000000000000000006);//0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);//base weth 0x4200000000000000000000000000000000000006
-        usdc = IERC20(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
+        mango = 0xe3A7bd1f7F0bdEEce9DBb1230E64FFf26cd2C8b6;//MANGO sepolia depoye
+        weth = IERC20(0x4200000000000000000000000000000000000006);
+        //usdc = IERC20(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
+        mangoReferral = IMangoReferral(0xACAB329d683979C4650A7CfA20d8685Fcd0Cd08F);
         presaleEnded = false;
     }
     
@@ -65,6 +67,7 @@ contract Presale {
             uint256 taxAmount = _tax(msg.value);
             uint256 referralFeeAmount =  _referalFee(taxAmount);
             mangoReferral.distributeReferralRewards(msg.sender,referralFeeAmount,referrer);
+            emit ReferralPayout(referralFeeAmount);
         }
     }
     function getAmountOutETH(uint256 amount) public view returns (uint256 tokensToReceive) {

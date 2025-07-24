@@ -18,8 +18,31 @@ ADDRESS: 0x8E161c59F22D41c466aAA7209A16E1Ea2773e383 //DEPLOY BY 787 Wllet
 
 
 ```
-sepolia
 
+-------  BASE depolyment addresses -------
+
+Mango router:
+
+Deployed to: 0x23F498aB49aA5E24c23d51e225F710E138D0c1D0
+Transaction hash: 0x18553dc0238e14407b4c5805de9c8807128c431ca9a1a4ce4c0f3f69b9e5ac27
+
+mangoDefi token:
+
+Deployed to: 0xe3A7bd1f7F0bdEEce9DBb1230E64FFf26cd2C8b6
+Transaction hash: 0x5f6b2233cfe46d65877a2af5b0a0ee78fb35887833ab46b10dc5b719e4442c0a
+
+
+Mango Referral
+
+Deployed to: 0xACAB329d683979C4650A7CfA20d8685Fcd0Cd08F
+Transaction hash: 0xb1c367d951c6a66879ee9e43c43139c2ff4ae499224a66ed8880b92c9e06fabe
+
+Presale
+
+Deployed to: 0x979fA80FfccF91f7482Bb7a6Cf821841d193274d
+Transaction hash: 0x72c822ee8dfeb511b94958ac1e508e0a5a5112b3d35f05c8028a4d07eaf8edfb
+
+------- sepolia -----------------
 
 ROUTER
 
@@ -28,6 +51,8 @@ Deployed to: 0x9E1672614377bBfdafADD61fB3Aa1897586D0903
 Transaction hash: 0x24aff23fca5608aebe1b5f2262629a10f7df58fad1fa8e7bef2bd4fd7fbf368a
 
 MANGO_DEFI
+
+
 
 Deployer: 0x49f2f071B1Ac90eD1DB1426EA01cA4C145c45d48
 Deployed to: 0xdAbF530587e25f8cB30813CABA0C3CB1DA4f83D4
@@ -38,6 +63,10 @@ MANGO_REFERRAL
 Deployer: 0x49f2f071B1Ac90eD1DB1426EA01cA4C145c45d48
 Deployed to: 0x7779E7cb3013809D1a8A3Bafee99af09bd6f130c
 Transaction hash: 0x7e4a0993d979bbbaf2da81e1bc04ec05cc65dd42d6948f7c8bc01728ad184c43
+
+PRESALE
+
+address :  0x1167606949c9CCF0c66622695Fa0154285bC8B3A
 ```
 
 

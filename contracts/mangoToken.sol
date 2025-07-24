@@ -28,12 +28,12 @@ contract MANGO_DEFI is ERC20 {
         _;
     }
 
-    constructor(address _router) ERC20("MANGO DEFI", "MANGO") {
+    constructor() ERC20("MANGO DEFI", "MANGO") {
         uint256 initialSupply = 100_000_000_000e18;
         _mint(msg.sender, initialSupply);
         owner = msg.sender;
         taxWallet = msg.sender;
-        uniswapRouterV2 = _router;
+        uniswapRouterV2 = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;//uniswap v2 router
         isExcludedFromTax[owner] = true;
         isExcludedFromTax[address(this)] = true;
         isExcludedFromTax[uniswapRouterV2] = true;
