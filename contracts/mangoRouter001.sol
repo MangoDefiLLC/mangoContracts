@@ -62,12 +62,12 @@ contract MangoRouter002 {
     event NewOwner(address newOner);
     constructor(){
         owner = msg.sender;
-        factoryV2 = IUniswapV2Factory(0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6);
-        factoryV3 = IUniswapV3Factory(0x33128a8fC17869897dcE68Ed026d694621f6FDfD);
-        routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);
-        swapRouter02 = ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
+        factoryV2 = IUniswapV2Factory(0xBCfCcbde45cE874adCB698cC183deBcF17952812);
+        factoryV3 = IUniswapV3Factory(0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865);
+        routerV2 = IRouterV2(0x10ED43C718714eb63d5aA57B78B54704E256024E);
+        swapRouter02 = ISwapRouter02(0x1b81D678ffb9C0263b24A97847620C99d213eB14);//bsc
         //ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
-        weth = IWETH9(0x4200000000000000000000000000000000000006);
+        weth = IWETH9(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
         //sepolia
         // factoryV2 = IUniswapV2Factory(0xF62c03E08ada871A0bEb309762E260a7a6a880E6);
         // factoryV3 = IUniswapV3Factory(0x0227628f3F023bb0B980b67D528571c95c6DaC1c);
@@ -172,7 +172,7 @@ contract MangoRouter002 {
         path.amount =  msg.value == 0 ? amount : _tax(msg.value);
         path.token0 = token0;
         path.token1 = token1;
-        path.referrer =  referrer == address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
+        path.referrer =  referrer;//== address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
         address pair = factoryV2.getPair(
                 token0 == address(0) ? address(weth):token0,
                 token1 == address(0) ? address(weth) : token1

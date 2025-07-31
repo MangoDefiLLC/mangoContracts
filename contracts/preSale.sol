@@ -18,7 +18,7 @@ contract Presale {
     uint256 public totalEthRaised;
 
    // Corrected prices in wei (1 ETH = $1800)
-    uint256 public PRICE = 100_000_000_000 wei; // $0.00002 (7e9 wei)
+    uint256 public PRICE; // $0.00002 (7e9 wei)
 
     event TokensPurchased(address indexed buyer, uint256 ethAmount, uint256 tokenAmount);
     event EthWithdrawn(address caller, uint256 amount);

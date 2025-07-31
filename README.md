@@ -1,5 +1,6 @@
 ## Mango contracts
 
+BAse
 #presaleContract
 #mangoTokenContracts
 
@@ -68,7 +69,10 @@ PRESALE
 
 address :  0x1167606949c9CCF0c66622695Fa0154285bC8B3A
 ```
-
+SMASRT CHAON
+```
+mangoRouter   0x71978719Fe4103B49bD3d7711eB22421f0410030
+```
 
 
 exclude this addresses
