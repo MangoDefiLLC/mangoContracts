@@ -14,19 +14,14 @@ interface CheatCodes {
  }
 contract test_Router_and_Referal is Test {
     CheatCodes public cheatCodes;
-    IMangoRouter public mangoRouter;
+    MangoRouter002 public mangoRouter;
     MANGO_DEFI public mangoToken;
     MangoReferral public  mangoReferral;
     uint256 public amount;
+    address public mango;
+    address public seller;
     //IAllowanceTransfer public permit2;
-    address public loaner;
-    address public b4 = 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17;
-    address public tester0 = address(0x10);
-    address public add1 = address(0x01);
-    address public add2 = address(0x02);
-    address public add3 = address(0x03);
-    address public add4 = address(0x0FB602E2E1eE587d9c0Da6368E352E33bfEcF12e);
-    address public add5 = address(0x05);
+
 
     address public weth;
     address public brett;
@@ -37,13 +32,16 @@ contract test_Router_and_Referal is Test {
         //router
         //token
         //referal
-        mangoRouter = IMangoRouter(0x9E1672614377bBfdafADD61fB3Aa1897586D0903);//0xeE629d83e42564A17Ea50E34c2D2A121d5A6E911);
-        weth = weth = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
+        mangoRouter = MangoRouter002(0xA6Ca4a815F6e1704c24B46C8a3450E3b9D9d422d);//0xeE629d83e42564A17Ea50E34c2D2A121d5A6E911);
+        weth = 0x4200000000000000000000000000000000000006;
         usdc = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
         cheatCodes = CheatCodes(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
-        cheatCodes.prank(0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17);
+        seller = 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17;
+        cheatCodes.prank(seller);
+        mango = 0x5Ac57Bf5395058893C1a0f4250D301498DCB11fC;
         //IERC20(usdc).approve(address(this),20e6);
-        IERC20(usdc).transfer(address(this),20e6);
+        //IERC20(mango).transfer(address(this), 150000e18);
+        deal(address(this),1e18);
 
 
         //deply referal to test it works
@@ -148,15 +146,28 @@ contract test_Router_and_Referal is Test {
     //     vm.prank(add1);
     //     mangoReferral.distributeReferralRewards(add1,1e18,tester0);
     // }
+       function test_sellMango() external {
+        uint256 ethBalanceBeforeSwap = seller.balance;
+        uint256 mangoBalanceBefore = IERC20(mango).balanceOf(seller);
+        console.log('mango Balance beofer',mangoBalanceBefore);
+        vm.startPrank(seller);
+        IERC20(mango).approve(address(mangoRouter),mangoBalanceBefore);
+        mangoRouter.swap(mango,address(0),mangoBalanceBefore-50000e18,address(0));
+        vm.stopPrank();
+
+        assertNotEq(mangoBalanceBefore,  IERC20(mango).balanceOf(seller));
+
+
+    }
     function test_swap() public {
         uint256 ethBalanceBeforeSwap = address(this).balance;
-        console.log(add1.balance,'balance of add 1 before swap');
-        console.log(IERC20(usdc).balanceOf(b4),'usdc balance of swapper before swap');
+        uint256 mangoBalanceBefore = IERC20(mango).balanceOf(address(this));
+
         //vm.startPrank(b4);
-        IERC20(usdc).approve(address(mangoRouter),IERC20(usdc).balanceOf(address(this)));
-        mangoRouter.swap(usdc,address(0),IERC20(usdc).balanceOf(address(this)),address(0));
-        vm.stopPrank();
-        console.log(IERC20(usdc).balanceOf(b4),'usdc balance of swapper after swap');
+        //IERC20(mango).approve(address(mangoRouter),150000000e18);
+        mangoRouter.swap{value:1e18}(address(0),mango,0,address(0));
+        assertNotEq(ethBalanceBeforeSwap,  address(this).balance);
+        assertNotEq(mangoBalanceBefore,IERC20(mango).balanceOf(address(this)));
         
     }
     fallback() external payable {}

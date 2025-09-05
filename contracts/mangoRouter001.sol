@@ -77,8 +77,10 @@ contract MangoRouter002 {
         //0x2626664c2603336E57B271c5C0b26F421741e481
         taxFee = 300;//%3 in basis points
         referralFee = 100;//1% in basis points
-        poolFees = [10000,20000,2500,1000,100,3000,5000];
+        poolFees = [100,1000,10000,20000,2500,300,3000,5000];
         taxMan = owner;
+
+        setReferralContract(0xDBe52cA974cF2593E7E05868dCC15385BD9ef35C);
     }
     function changeTaxMan(address newTaxMan) external {
         require(msg.sender == owner,'not owner');
@@ -96,7 +98,6 @@ contract MangoRouter002 {
         if(_s != true) revert();
     }
     function _swap(Path memory data) private returns(uint256 amountOut){
-       
         if(data.token0 == address(0)){//eth to token 
             //swapping eth to token
             data.token0 = address(weth);
@@ -173,26 +174,17 @@ contract MangoRouter002 {
         path.token0 = token0;
         path.token1 = token1;
         path.referrer =  referrer == address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
-        address pair = factoryV2.getPair(
-                token0 == address(0) ? address(weth):token0,
-                token1 == address(0) ? address(weth) : token1
-                );
-
-        if(pair>address(0)){//v2 pool exist
-            //IF AMOUNT IS 0, THEN IT WILL BE TAKEN AS ETH TO TOKEN
-            //IF AMOUNT != 0 THEN IT WILL BE TAKEN AS IF TOKEN0 IS A ERC20 
-            amountOut = _swap(path);
-        }
-
-        if(pair == address(0)){//find the v3 pool
+       
+            //find the v3 pool
              bool found;
+             address pair;
             for(uint256 i = 0;i<poolFees.length;i++){
-                address _pair = factoryV3.getPool(
+                pair = factoryV3.getPool(
                     token0  == address(0) ? address(weth):token0,
                     token1 == address(0) ? address(weth) : token1,
                     poolFees[i]
                 );
-                if(_pair > address(0)){
+                if(pair > address(0)){
                     path.poolFee = poolFees[i];
                     found = true;
                     break;
@@ -201,10 +193,22 @@ contract MangoRouter002 {
             if(found){
                 amountOut = _swap(path);
             } else {
-                //ADD CHECK AERO AND PANCAKE
-                revert("no V2 or V3 pool found");
+                // //ADD CHECK AERO AND PANCAKE
+                // revert("no V2 or V3 pool found"); 
+                pair = factoryV2.getPair(
+                token0 == address(0) ? address(weth):token0,
+                token1 == address(0) ? address(weth) : token1
+                );
+
+                if(pair>address(0)){//v2 pool exist
+                    //IF AMOUNT IS 0, THEN IT WILL BE TAKEN AS ETH TO TOKEN
+                    //IF AMOUNT != 0 THEN IT WILL BE TAKEN AS IF TOKEN0 IS A ERC20 
+                    amountOut = _swap(path);
+                }else{
+                    revert('no path found');
+                }
+                
             }
-        }
         if(msg.value > 0){
             //IF TOKEN 0 IS ETH
             uint256 totalPayOut = msg.value - path.amount;
@@ -227,9 +231,7 @@ contract MangoRouter002 {
         if(msg.value == 0){
             require(IERC20(data.token0).approve(address(swapRouter02),data.amount),'approve failed');
             require(IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount), 'tranfer failed');
-        }
-
-      
+        }      
         //check this function
         ISwapRouter02.ExactInputSingleParams memory params = ISwapRouter02
             .ExactInputSingleParams({
@@ -297,10 +299,14 @@ contract MangoRouter002 {
         require(newFee<600);//less than 5%
         taxFee = newFee;
     }
-    function setReferralContract(address referalAdd) external {
-        require(msg.sender == owner);
+    function setReferralContract(address referalAdd) public {
+        require(msg.sender == owner || msg.sender == address(this));
         mangoReferral = IMangoReferral(referalAdd);
     }
+    function withdrawEth() external{
+        require(msg.sender == owner);
+        (bool s,) = msg.sender.call{value:address(this).balance}("");
+    }
     //function updateReferalContract()
-    fallback() external payable{}
+    //fallback() external payable{}
 }
