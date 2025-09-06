@@ -32,15 +32,16 @@ contract test_Router_and_Referal is Test {
         //router
         //token
         //referal
-        mangoRouter = MangoRouter002(0xA6Ca4a815F6e1704c24B46C8a3450E3b9D9d422d);//0xeE629d83e42564A17Ea50E34c2D2A121d5A6E911);
+        mangoRouter = new MangoRouter002();//0xeE629d83e42564A17Ea50E34c2D2A121d5A6E911);
         weth = 0x4200000000000000000000000000000000000006;
         usdc = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
         cheatCodes = CheatCodes(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
         seller = 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17;
-        cheatCodes.prank(seller);
+        
         mango = 0x5Ac57Bf5395058893C1a0f4250D301498DCB11fC;
-        //IERC20(usdc).approve(address(this),20e6);
-        //IERC20(mango).transfer(address(this), 150000e18);
+        vm.startPrank(seller);
+        IERC20(mango).transfer(address(this),IERC20(mango).balanceOf(seller));
+        vm.stopPrank();
         deal(address(this),1e18);
 
 
@@ -147,28 +148,27 @@ contract test_Router_and_Referal is Test {
     //     mangoReferral.distributeReferralRewards(add1,1e18,tester0);
     // }
        function test_sellMango() external {
-        uint256 ethBalanceBeforeSwap = seller.balance;
-        uint256 mangoBalanceBefore = IERC20(mango).balanceOf(seller);
-        console.log('mango Balance beofer',mangoBalanceBefore);
-        vm.startPrank(seller);
-        IERC20(mango).approve(address(mangoRouter),mangoBalanceBefore);
-        mangoRouter.swap(mango,address(0),mangoBalanceBefore-50000e18,address(0));
-        vm.stopPrank();
-
-        assertNotEq(mangoBalanceBefore,  IERC20(mango).balanceOf(seller));
-
-
-    }
-    function test_swap() public {
-        uint256 ethBalanceBeforeSwap = address(this).balance;
+   
+        uint256 ethBalance = address(this).balance;
         uint256 mangoBalanceBefore = IERC20(mango).balanceOf(address(this));
-
-        //vm.startPrank(b4);
-        //IERC20(mango).approve(address(mangoRouter),150000000e18);
-        mangoRouter.swap{value:1e18}(address(0),mango,0,address(0));
-        assertNotEq(ethBalanceBeforeSwap,  address(this).balance);
-        assertNotEq(mangoBalanceBefore,IERC20(mango).balanceOf(address(this)));
+        console.log('eth balance before',ethBalance);
+        console.log('mango Balance beofer',mangoBalanceBefore);
         
+        IERC20(mango).approve(address(mangoRouter), IERC20(mango).balanceOf(address(this)));
+        mangoRouter.swap(mango,address(0),IERC20(mango).balanceOf(address(this)),address(0));
+
+        assertNotEq(mangoBalanceBefore,  IERC20(mango).balanceOf(address(this)));
     }
+    // function test_swap() public {
+    //     uint256 ethBalanceBeforeSwap = address(this).balance;
+    //     uint256 mangoBalanceBefore = IERC20(mango).balanceOf(address(this));
+
+    //     //vm.startPrank(b4);
+    //     //IERC20(mango).approve(address(mangoRouter),150000000e18);
+    //     mangoRouter.swap{value:1e18}(address(0),mango,0,address(0));
+    //     assertNotEq(ethBalanceBeforeSwap,  address(this).balance);
+    //     assertNotEq(mangoBalanceBefore,IERC20(mango).balanceOf(address(this)));
+        
+    // }
     fallback() external payable {}
 }

@@ -53,6 +53,7 @@ contract MangoRouter002 {
         address token0, 
         address token1,
         uint amountOut);
+    event Amount(uint256,uint256);
 
     event ReferralPayout(uint256 amountToReferral);
    
@@ -106,22 +107,29 @@ contract MangoRouter002 {
             emit Swap(msg.sender,data.token0,data.token1,amountOut);
 
         }else if(data.token1 == address(0)){//token to eth 
+    
             data.token1 = address(weth);
             data.amount = data.amount;
             data.receiver = address(this);
             amountOut = data.poolFee == 0 ? _tokensToEthV2(data) : tokensToTokensV3(data);
 
             emit Swap(msg.sender,data.token0,data.token1,amountOut);
-
-            //UNWRAP ETH AFTER TOKPEN TO TOKEN SWAP
-            if(data.poolFee > 0){
-                 weth.withdraw(amountOut);
-            }
             //tax and pay taxman
             uint256 toUser = _tax(amountOut);
-            (bool s,) = msg.sender.call{value:toUser}("");
-            if(s != true) revert();
 
+            //UNWRAP ETH AFTER TOKPEN TO TOKEN SWAP
+            //only when v3 pool
+            emit Amount(amountOut,IERC20(address(weth)).balanceOf(address(this)));
+            if(data.poolFee > 0){
+                  (bool success, ) = address(weth).call(
+                    abi.encodeWithSignature("withdraw(uint256)", toUser)
+                );
+                require(success, "Unwrap failed");
+            }else{
+                (bool s,) = msg.sender.call{value:toUser}("");
+                if(s != true) revert('TF!!!!!!');
+            
+            }
             if(data.referrer > address(0)){
                 uint256 referalPay = _referalFee(toUser - amountOut);
                 mangoReferral.distributeReferralRewards(msg.sender,referalPay,data.referrer);
@@ -308,5 +316,5 @@ contract MangoRouter002 {
         (bool s,) = msg.sender.call{value:address(this).balance}("");
     }
     //function updateReferalContract()
-    //fallback() external payable{}
+    fallback() external payable{}
 }
