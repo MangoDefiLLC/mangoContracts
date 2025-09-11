@@ -91,7 +91,7 @@ contract MangoRouter002 {
         amount = _amount - taxAmount;//amount is the amount to user de rest is the fee
     }
      function _referalFee(uint256 amount) private view returns (uint256 referalPay){//this amount is the 3% for taxMan
-        referalPay = (amount * referralFee + 9999) / 10000; 
+        referalPay = (amount * referralFee) / 10000; 
     }
     function _payTaxMan(uint256 amount) private {
         (bool _s,) = taxMan.call{value:amount}("");
@@ -138,7 +138,7 @@ contract MangoRouter002 {
 
                 //ones user is paid check if user has referral
                 if(data.referrer > address(0)){
-                    uint256 referalPay = _referalFee(amountOut-amountToUser);
+                    uint256 referalPay = _referalFee(amountOut-amountToUser);//pass 3%
                     mangoReferral.distributeReferralRewards(msg.sender,referalPay,data.referrer);
                     emit ReferralPayout(referalPay);
                     //pay tax man
