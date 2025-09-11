@@ -18,15 +18,10 @@ contract test_Router_and_Referal is Test {
     MANGO_DEFI public mangoToken;
     MangoReferral public  mangoReferral;
     uint256 public amount;
+    address public mango;
+    address public seller;
     //IAllowanceTransfer public permit2;
-    address public loaner;
-    address public b4 = 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17;
-    address public tester0 = address(0x10);
-    address public add1 = address(0x01);
-    address public add2 = address(0x02);
-    address public add3 = address(0x03);
-    address public add4 = address(0x0FB602E2E1eE587d9c0Da6368E352E33bfEcF12e);
-    address public add5 = address(0x05);
+
 
     address public weth;
     address public brett;
@@ -47,8 +42,6 @@ contract test_Router_and_Referal is Test {
         cheatCodes.prank(0xF977814e90dA44bFA03b6295A0616a897441aceC);
         //IERC20(usdc).approve(address(this),20e6);
         IERC20(usdt).transfer(address(this),20e6);
-
-
         //deply referal to test it works
         //mangoReferal = new MangoReferral(address(this),address(mangoRouter));//owner and router
     
@@ -162,5 +155,29 @@ contract test_Router_and_Referal is Test {
     //     vm.prank(add1);
     //     mangoReferral.distributeReferralRewards(add1,1e18,tester0);
     // }
+       function test_sellMango() external {
+        vm.startPrank(seller);
+        uint256 ethBalance = address(this).balance;
+        uint256 mangoBalanceBefore = IERC20(mango).balanceOf(seller);
+        console.log('eth balance before',ethBalance);
+        console.log('mango Balance beofer',mangoBalanceBefore);
+        
+        IERC20(mango).approve(address(mangoRouter), IERC20(mango).balanceOf(seller));
+        mangoRouter.swap(mango,address(0),32000e18,address(0));
+
+        assertNotEq(mangoBalanceBefore,  IERC20(mango).balanceOf(seller));
+    }
+    // function test_swap() public {
+    //     uint256 ethBalanceBeforeSwap = address(this).balance;
+    //     uint256 mangoBalanceBefore = IERC20(mango).balanceOf(address(this));
+
+    //     //vm.startPrank(b4);
+    //     //IERC20(mango).approve(address(mangoRouter),150000000e18);
+    //     mangoRouter.swap{value:1e18}(address(0),mango,0,address(0));
+    //     assertNotEq(ethBalanceBeforeSwap,  address(this).balance);
+    //     assertNotEq(mangoBalanceBefore,IERC20(mango).balanceOf(address(this)));
+        
+    // }
+
     fallback() external payable {}
 }
