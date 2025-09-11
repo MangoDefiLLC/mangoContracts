@@ -79,8 +79,7 @@ contract MangoRouter002 {
         taxFee = 300;//%3 in basis points
         referralFee = 100;//1% in basis points
         poolFees = [100,1000,10000,20000,2500,300,3000,5000];
-        taxMan = owner;
-
+        taxMan = 0x63aA40A6DF3AB3C7B0A8173b5c31e8982A8A5538;
         setReferralContract(0xDBe52cA974cF2593E7E05868dCC15385BD9ef35C);
     }
     function changeTaxMan(address newTaxMan) external {
@@ -99,11 +98,13 @@ contract MangoRouter002 {
         if(_s != true) revert();
     }
     function _swap(Path memory data) private returns(uint256 amountOut){
+        uint256  amountToUser;
         if(data.token0 == address(0)){//eth to token 
             //swapping eth to token
             data.token0 = address(weth);
             data.receiver = msg.sender;
             amountOut = data.poolFee == 0 ? _ethToTokensV2(data.token1,data.amount) : tokensToTokensV3(data);
+           
             emit Swap(msg.sender,data.token0,data.token1,amountOut);
 
         }else if(data.token1 == address(0)){//token to eth 
@@ -114,30 +115,45 @@ contract MangoRouter002 {
             amountOut = data.poolFee == 0 ? _tokensToEthV2(data) : tokensToTokensV3(data);
 
             emit Swap(msg.sender,data.token0,data.token1,amountOut);
-            //tax and pay taxman
-            uint256 toUser = _tax(amountOut);
 
             //UNWRAP ETH AFTER TOKPEN TO TOKEN SWAP
             //only when v3 pool
             emit Amount(amountOut,IERC20(address(weth)).balanceOf(address(this)));
             if(data.poolFee > 0){
+                //unswarpp amount
                   (bool success, ) = address(weth).call(
-                    abi.encodeWithSignature("withdraw(uint256)", toUser)
+                    abi.encodeWithSignature("withdraw(uint256)", amountOut)
                 );
                 require(success, "Unwrap failed");
-            }else{
-                (bool s,) = msg.sender.call{value:toUser}("");
+
+                //tax and pay taxman
+                //@- uint256 tax is actually the amount that needs to be send to user
+                //the _tax function returns the amount to user
+                // so when paying tax man should be msg.value-tax
+                amountToUser = _tax(amountOut);
+
+                //pay user its funds
+                (bool s,) = msg.sender.call{value:amountToUser}("");
                 if(s != true) revert('TF!!!!!!');
+
+                //ones user is paid check if user has referral
+                if(data.referrer > address(0)){
+                    uint256 referalPay = _referalFee(amountOut-amountToUser);
+                    mangoReferral.distributeReferralRewards(msg.sender,referalPay,data.referrer);
+                    emit ReferralPayout(referalPay);
+                    //pay tax man
+                    uint256 taxManPay = (amountOut-amountToUser)-referalPay;
+                    _payTaxMan(taxManPay);
+                }else{
+                    _payTaxMan(amountOut-amountToUser);
+                }
+
+            }else{
+                (bool s,) = msg.sender.call{value:amountToUser}("");
+                if(s != true) revert('TF!!!!!!');
+                _payTaxMan(amountOut - amountToUser);
             
             }
-            if(data.referrer > address(0)){
-                uint256 referalPay = _referalFee(toUser - amountOut);
-                mangoReferral.distributeReferralRewards(msg.sender,referalPay,data.referrer);
-                emit ReferralPayout(referalPay);
-            }else{
-                 _payTaxMan(amountOut - toUser);
-            }
-
         }else if(data.token0 > address(0) && data.token1 > address(0)){//token to token
             //ADD TAX TO TOKENS TO TOKEN TRANSACTIONS
             data.receiver = msg.sender;
@@ -178,7 +194,7 @@ contract MangoRouter002 {
     
         Path memory path;
         
-        path.amount =  msg.value == 0 ? amount : _tax(msg.value);
+        path.amount =  msg.value == 0 ? amount : _tax(msg.value);//only tax eth to token
         path.token0 = token0;
         path.token1 = token1;
         path.referrer =  referrer == address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
@@ -217,16 +233,16 @@ contract MangoRouter002 {
                 }
                 
             }
-        if(msg.value > 0){
+        if(msg.value > 0){//with this logic im assuming all eth to token swap will br on uniswapv2
             //IF TOKEN 0 IS ETH
-            uint256 totalPayOut = msg.value - path.amount;
+            uint256 totalPayOut = msg.value - path.amount;//this amount is already taxed
             if(path.referrer > address(0)){//user has a referer
 
-                uint256 referralPay = _referalFee(totalPayOut);
+                uint256 referralPay = _referalFee(totalPayOut);//get the % to pey referal
                 mangoReferral.distributeReferralRewards(msg.sender,referralPay,path.referrer);
 
                 emit ReferralPayout(referralPay);
-                _payTaxMan(totalPayOut);
+                _payTaxMan(totalPayOut-referralPay);
 
             }else{
                 _payTaxMan(totalPayOut);
@@ -259,7 +275,6 @@ contract MangoRouter002 {
             }
     }
      //sell usdc for Weth in v3 pool
-
     //DEV
     //this is a modifies version of the swapv2 
     //to collect eth on the way in on swap function
@@ -302,11 +317,6 @@ contract MangoRouter002 {
         owner = newOwner;
         emit NewOwner(newOwner);
     }
-    function changeFee(uint24 newFee) public {
-        require(msg.sender == owner);
-        require(newFee<600);//less than 5%
-        taxFee = newFee;
-    }
     function setReferralContract(address referalAdd) public {
         require(msg.sender == owner || msg.sender == address(this));
         mangoReferral = IMangoReferral(referalAdd);
@@ -314,7 +324,21 @@ contract MangoRouter002 {
     function withdrawEth() external{
         require(msg.sender == owner);
         (bool s,) = msg.sender.call{value:address(this).balance}("");
+        if(s == false) revert('TF!');
+    }
+    function withdrawToken(address token) external {
+        require(msg.sender == owner);
+        uint256 amount = IERC20(token).balanceOf(address(this));
+        require(IERC20(token).transfer(msg.sender,amount));
+    }
+    function withdrawWETH(address token) external {
+        require(msg.sender == owner);
+        uint256 amount = IERC20(token).balanceOf(address(this));
+        IWETH9(token).withdraw(amount);
+        _payTaxMan(amount);
     }
     //function updateReferalContract()
-    fallback() external payable{}
+    fallback() external payable{
+        //_payTaxMan(msg.value);
+    }
 }
