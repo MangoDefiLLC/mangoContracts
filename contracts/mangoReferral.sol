@@ -6,11 +6,8 @@ import {IERC20} from './interfaces/IERC20.sol';
 import {IRouterV2} from './interfaces/IRouterV2.sol';
 //@DEV
 //THIS CONTRACT IS DESIGNE SO DISTRIBUTE THE FEE TO THE REFERRERS
-//DISTRIBUTES THE AMOUNTS IN $MANGO
-//NOTE: ADD THAT IF OTHER TOKENS IS SENDT IS ABLE TO SWAP IT TO WETH
-//@ADD:  RQUIRE MSG.SENDER IS MANGO ROUTER
-//NOTE THE AMOUNT THAT IS SENT TO THIS CONTRACT IS ALREADY THE 1% 
-//OF THE %3 OF THE SWAP
+// SMARTCHAIN REFERRAL WILL PAY IN ACTUALL NATIVE CURRENCY BNB
+// IT WILL RECIEVE THE %1 OF THE ROUTER
 contract MangoReferral {
 
      address public owner;
@@ -74,22 +71,22 @@ contract MangoReferral {
     ///CREATE FUNCTION TO
     function distributeReferralRewards(
         address userAddress,//msg.sender the one initiated the swap
-        uint256 inputAmount,//amount to distribute IF THIS AMOUNT IS NOT 0, SWAP TOKEN TO ETH
+        //uint256 inputAmount,//amount to distribute IF THIS AMOUNT IS NOT 0, SWAP TOKEN TO ETH
         address referrer// the referrer
     ) external payable {
         require(mangoRouters[msg.sender],'only mango routers can call Distribution');
-        uint256 mangoTokensAmount = _getMangoAmountETH(inputAmount);
-
+        require(msg.value != 0 ,'msg.value == 0');
+        
         _buildReferralChainAndTransferRewards(
             userAddress,
-            mangoTokensAmount,//Amount to distribute
+            msg.value,//Amount to distribute
             referrer
         );
     }
 
     function _buildReferralChainAndTransferRewards(
         address userAddress,//the one who initiated the TX
-        uint256 mangoTokensAmount,//Amount Of $MANGO TO  DISTRIBUTE
+        uint256 amount,//Amount Of $MANGO TO  DISTRIBUTE
         address referrer
     ) private returns (ReferralReward[] memory) {
         // Update Referrer
@@ -98,16 +95,10 @@ contract MangoReferral {
             referrer != address(0) &&
             referrer != userAddress
         ) {
-            referralChain[userAddress] = referrer;
+            referralChain[userAddress] = referrer;// map msg.sender => referrer
             emit ReferralAdded(referrer,userAddress);
         }
-        // Check contract's token balance
-        uint256 contractBalance = mangoToken.balanceOf(address(this));
-        //add if contract is empty, pull necesarry amount from dev wallet to pay users
-        require(
-            contractBalance > 0,
-            "Insufficient contract mango tokens balance"
-        );
+       
         // Create array to track rewards (max 5 levels)
         ReferralReward[] memory rewards = new ReferralReward[](5);
         uint256 totalRewardsToDistribute = 0;
@@ -127,8 +118,7 @@ contract MangoReferral {
             }
 
             // Calculate reward for this level (in basis points)
-            uint256 rewardForLevel = (mangoTokensAmount *
-                rewardPercentages[i]) / 10000;
+            uint256 rewardForLevel = ( amount * rewardPercentages[i] ) / 10000;
 
             // Store reward information
             rewards[chainLength] = ReferralReward({
@@ -150,8 +140,8 @@ contract MangoReferral {
 
         // Check if we have enough balance to distribute all rewards
         require(
-            contractBalance >= totalRewardsToDistribute,
-            "Insufficient mango token balance for all rewards"
+            amount >= totalRewardsToDistribute,
+            "Insufficient balance for all rewards"
         );
 
         // Distribute rewards
@@ -159,10 +149,8 @@ contract MangoReferral {
             ReferralReward memory reward = rewards[i];
 
             // Transfer tokens to the referrer
-            require(
-                mangoToken.transfer(reward.referrerAddress, reward.amount),
-                "Token transfer failed"
-            );
+            (bool s,) = reward.referrerAddress.call{value:reward.amount}("");
+            require(s,"paying referrer failed!");
             emit DistributedAmount(totalRewardsToDistribute);
         }
         return rewards;

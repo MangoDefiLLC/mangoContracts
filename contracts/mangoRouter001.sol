@@ -197,25 +197,10 @@ contract MangoRouter002 {
         path.amount =  msg.value == 0 ? amount : _tax(msg.value);//only tax eth to token
         path.token0 = token0;
         path.token1 = token1;
-<<<<<<< HEAD
-        path.referrer =  referrer;//== address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
-        address pair = factoryV2.getPair(
-                token0 == address(0) ? address(weth):token0,
-                token1 == address(0) ? address(weth) : token1
-                );
 
-        if(pair>address(0)){//v2 pool exist
-            //IF AMOUNT IS 0, THEN IT WILL BE TAKEN AS ETH TO TOKEN
-            //IF AMOUNT != 0 THEN IT WILL BE TAKEN AS IF TOKEN0 IS A ERC20 
-            amountOut = _swap(path);
-        }
-
-        if(pair == address(0)){//find the v3 pool
-=======
         path.referrer =  referrer == address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
        
             //find the v3 pool
->>>>>>> main
              bool found;
              address pair;
             for(uint256 i = 0;i<poolFees.length;i++){
@@ -255,7 +240,14 @@ contract MangoRouter002 {
             if(path.referrer > address(0)){//user has a referer
 
                 uint256 referralPay = _referalFee(totalPayOut);//get the % to pey referal
-                mangoReferral.distributeReferralRewards(msg.sender,referralPay,path.referrer);
+
+                //call distribute rewards passing it referral pay
+                (bool s,) = address(mangoReferral).call(
+                    abi.encodeWithSignature(
+                    "distributeReferralRewards(address,uint256,address)",
+                    msg.sender,referralPay,path.referrer)
+                );
+                require(s,'sending funds to referralContract failed!');
 
                 emit ReferralPayout(referralPay);
                 _payTaxMan(totalPayOut-referralPay);
