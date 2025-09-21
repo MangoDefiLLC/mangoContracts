@@ -1,44 +1,32 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 //import {IUniversalRouter} from './interfaces/IUniversalRouter.sol';
 
 import {IRouterV2} from './interfaces/IRouterV2.sol';
+import {ISwapRouter02} from './interfaces/ISwapRouter02.sol';
 import {IWETH9} from './interfaces/IWETH9.sol';
-import {IERC20} from './interfaces/IERC20.sol';
+import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IMangoReferral} from './interfaces/IMangoReferral.sol';
 import {IUniswapV3Factory } from './interfaces/IUniswapV3Factory.sol';
 import {IUniswapV2Factory } from './interfaces/IUniswapV2Factory.sol';
 import {MangoReferral} from "./mangoReferral.sol";
-
-interface ISwapRouter02 {
-    struct ExactInputSingleParams {
-        address tokenIn;
-        address tokenOut;
-        uint24 fee;
-        address recipient;
-        uint256 amountIn;
-        uint256 amountOutMinimum;
-        uint160 sqrtPriceLimitX96;
-    }
-
-    function exactInputSingle(ExactInputSingleParams calldata params)
-        external
-        payable
-        returns (uint256 amountOut);
-}
+import {ReentrancyGuard} from '@openzeppelin/contracts/security/ReentrancyGuard.sol';
+import {Pausable} from '@openzeppelin/contracts/security/Pausable.sol';
+import {Ownable} from '@openzeppelin/contracts/access/Ownable.sol';z
+import {IMangoErrors} from './interfaces/IMangoErrors.sol';
 
 //@DEV this is the first version of the MAngo router
-contract MangoRouter002 {
+contract MangoRouter002 is ReentrancyGuard, Ownable {
 
-    address public owner;
     IUniswapV2Factory public immutable factoryV2;
     IUniswapV3Factory public immutable factoryV3;
     IMangoReferral public  mangoReferral;
     ISwapRouter02 public immutable swapRouter02;
     IRouterV2 public immutable routerV2;
     IWETH9 public immutable weth;
-    address public taxMan;
+    address public taxMan; //receiver of the tax
     uint256 public  referralFee;
+    uint256 public constant basisPoints;;
 
     struct Path {
         address token0;
@@ -61,41 +49,41 @@ contract MangoRouter002 {
     uint24 public taxFee;
 
     event NewOwner(address newOner);
-    constructor(){
-        owner = msg.sender;
-        factoryV2 = IUniswapV2Factory(0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6);
-        factoryV3 = IUniswapV3Factory(0x33128a8fC17869897dcE68Ed026d694621f6FDfD);
-        routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);
-        swapRouter02 = ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
+    constructor() Ownable(msg.sender) {
+        //owner = msg.sender;
+        factoryV2 = IUniswapV2Factory(0xBCfCcbde45cE874adCB698cC183deBcF17952812);
+        factoryV3 = IUniswapV3Factory(0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865);
+        routerV2 = IRouterV2(0x10ED43C718714eb63d5aA57B78B54704E256024E);
+        swapRouter02 = ISwapRouter02(0x1b81D678ffb9C0263b24A97847620C99d213eB14);//bsc
         //ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
-        weth = IWETH9(0x4200000000000000000000000000000000000006);
-        //sepolia
-        // factoryV2 = IUniswapV2Factory(0xF62c03E08ada871A0bEb309762E260a7a6a880E6);
-        // factoryV3 = IUniswapV3Factory(0x0227628f3F023bb0B980b67D528571c95c6DaC1c);
-        // routerV2 = IRouterV2(0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3);
-        // weth = IWETH9(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);// sepolia 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14);
-        // swapRouter02 = ISwapRouter02(0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E);//ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
-        //0x2626664c2603336E57B271c5C0b26F421741e481
+        weth = IWETH9(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
         taxFee = 300;//%3 in basis points
         referralFee = 100;//1% in basis points
-        poolFees = [100,1000,10000,20000,2500,300,3000,5000];
-        taxMan = 0x63aA40A6DF3AB3C7B0A8173b5c31e8982A8A5538;
+        basisPoints = 10000
+        //I WIll like to see how to make better the search of the pool
+        //or jut route to a msart router
+        poolFees = [100,1000,basisPoints,20000,2500,300,3000,5000];
+        taxMan = msg.sender;//taxman is set to msg.sender until changed
+        //ideally you want taxman to the the manager SMC
         setReferralContract(0xDBe52cA974cF2593E7E05868dCC15385BD9ef35C);
     }
     function changeTaxMan(address newTaxMan) external {
-        require(msg.sender == owner,'not owner');
+        if(msg.sender != owner()) revert NotOwner();
         taxMan = newTaxMan;
     }
+    function _transferEth(address receiver,uint256 amount) internal{
+        (s,) = receiver.call{value:amount}("");
+        if(s != true) revert TransferFailed();
+    }
     function _tax(uint256 _amount) private view returns(uint256 amount){
-        uint256 taxAmount = _amount * taxFee / 10000;
+        uint256 taxAmount = _amount * taxFee / basisPoints;
         amount = _amount - taxAmount;//amount is the amount to user de rest is the fee
     }
      function _referalFee(uint256 amount) private view returns (uint256 referalPay){//this amount is the 3% for taxMan
-        referalPay = (amount * referralFee) / 10000; 
+        referalPay = (amount * referralFee) / basisPoints; 
     }
     function _payTaxMan(uint256 amount) private {
-        (bool _s,) = taxMan.call{value:amount}("");
-        if(_s != true) revert();
+        _transferEth(taxMan,amount);
     }
     function _swap(Path memory data) private returns(uint256 amountOut){
         uint256  amountToUser;
@@ -124,18 +112,13 @@ contract MangoRouter002 {
                   (bool success, ) = address(weth).call(
                     abi.encodeWithSignature("withdraw(uint256)", amountOut)
                 );
-                require(success, "Unwrap failed");
-
-                //tax and pay taxman
-                //@- uint256 tax is actually the amount that needs to be send to user
-                //the _tax function returns the amount to user
-                // so when paying tax man should be msg.value-tax
+                if(!success) revert EthUnwrapFailed();
+                //get amount to user after tax
                 amountToUser = _tax(amountOut);
 
                 //pay user its funds
-                (bool s,) = msg.sender.call{value:amountToUser}("");
-                if(s != true) revert('TF!!!!!!');
-
+                _transferEth(msg.sedner,amountToUser);
+                
                 //ones user is paid check if user has referral
                 if(data.referrer > address(0)){
                     uint256 referalPay = _referalFee(amountOut-amountToUser);//pass 3%
@@ -149,8 +132,7 @@ contract MangoRouter002 {
                 }
 
             }else{
-                (bool s,) = msg.sender.call{value:amountToUser}("");
-                if(s != true) revert('TF!!!!!!');
+                 _transferEth(msg.sender,amountToUser);
                 _payTaxMan(amountOut - amountToUser);
             
             }
@@ -182,21 +164,21 @@ contract MangoRouter002 {
         return amount[1];
     }
     function swap(address token0, address token1,uint256 amount,address referrer) external payable returns(uint amountOut){
-        if(msg.value == 0 && amount == 0) revert('both AMOUNTS cant be zero');
-        if(msg.value > 0 && amount > 0) revert('both AMOUNTS cant be bigger than 0');
-        if(token0 == address(0) && msg.value == 0) revert('token0 is address 0 , msg.value cant be 0');
-        if(token1 == address(0) && amount == 0) revert('token1 is address zero, amount cant be zero');
-        if(token0 == address(0) && token1 == address(0)) revert('both cant be address(0)');
-
-        //CHECK IF SWAPPER IS A REFERRE
-        //IF TRUE THEN TAKE THE 1% OF THE 3%
-        //ELSE SWAP NORMALLY
+        if(msg.value == 0 && amount == 0) revert BothCantBeZero();
+        if(msg.value > 0 && amount > 0) revert BothCantBeZero();
+         //if swapping eth msg.value cant be zero
+        if(token0 == address(0) && msg.value == 0) revert ValueIsZero();
+        //when swapping tokens the amount param cant be 0
+        if(token1 == address(0) && amount == 0) revert ValueIsZero();
+        //both tokens cant be 0
+        if(token0 == address(0) && token1 == address(0)) revert BothCantBeZero();
     
         Path memory path;
         
         path.amount =  msg.value == 0 ? amount : _tax(msg.value);//only tax eth to token
         path.token0 = token0;
         path.token1 = token1;
+
         path.referrer =  referrer == address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
        
             //find the v3 pool
@@ -233,13 +215,21 @@ contract MangoRouter002 {
                 }
                 
             }
-        if(msg.value > 0){//with this logic im assuming all eth to token swap will br on uniswapv2
-            //IF TOKEN 0 IS ETH
+        if(msg.value > 0){
             uint256 totalPayOut = msg.value - path.amount;//this amount is already taxed
+            //TOTAL PAYOUT IS CURERNTLYU THE 3%
             if(path.referrer > address(0)){//user has a referer
 
-                uint256 referralPay = _referalFee(totalPayOut);//get the % to pey referal
-                mangoReferral.distributeReferralRewards(msg.sender,referralPay,path.referrer);
+                uint256 referralPay = _referalFee(totalPayOut);//GET THE 1% FOR THE REFERRAL
+                //E: THIS SNIPPET IS ONLU FOR NONE BASE
+
+                //call distribute rewards passing it referral pay
+                (bool s,) = address(mangoReferral).call(
+                    abi.encodeWithSignature(
+                    "distributeReferralRewards(address,uint256,address)",
+                    msg.sender,referralPay,path.referrer)
+                );
+                if(!s) revert CallDistributeFailed();
 
                 emit ReferralPayout(referralPay);
                 _payTaxMan(totalPayOut-referralPay);
@@ -313,7 +303,7 @@ contract MangoRouter002 {
     }
 
     function changeOwner(address newOwner) external {
-        if(msg.sender != owner) revert();
+        if(msg.sender != owner) revert NotOwner();
         owner = newOwner;
         emit NewOwner(newOwner);
     }
@@ -322,23 +312,14 @@ contract MangoRouter002 {
         mangoReferral = IMangoReferral(referalAdd);
     }
     function withdrawEth() external{
-        require(msg.sender == owner);
-        (bool s,) = msg.sender.call{value:address(this).balance}("");
-        if(s == false) revert('TF!');
+        if(msg.sender != owner) revert NotOwner();
+        bool s = _transferEth(msg.sedner,address(this).balance);
     }
+    //THIS FUNCTION IS TO RESCUE TOKENS SENT BY MISTAKE TO THE CONTRACT
+    //ONLY OWNER CAN CALL THIS FUNCTION
     function withdrawToken(address token) external {
-        require(msg.sender == owner);
+       if(msg.sender != owner) revert NotOwner();
         uint256 amount = IERC20(token).balanceOf(address(this));
         require(IERC20(token).transfer(msg.sender,amount));
-    }
-    function withdrawWETH(address token) external {
-        require(msg.sender == owner);
-        uint256 amount = IERC20(token).balanceOf(address(this));
-        IWETH9(token).withdraw(amount);
-        _payTaxMan(amount);
-    }
-    //function updateReferalContract()
-    fallback() external payable{
-        //_payTaxMan(msg.value);
     }
 }
