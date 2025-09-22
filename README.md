@@ -42,7 +42,12 @@ add deployment addresses bellow
 In mango router everything starts with the **swap()** function.
 
 ```
-    function swap(address token0, address token1,uint256 amount,address referrer) external payable returns(uint amountOut)
+    function swap(
+        address token0,
+        address token1,
+        uint256 amount,
+        address referrer
+        ) external payable returns(uint amountOut)
 ```
 
 
