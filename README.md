@@ -28,7 +28,7 @@ mango defi contracts are the bread and butter of mango echosystem.
 add deployment addresses bellow
 
 
-## Mango contracts
+## Mango Depolyment Addresses
 
 | Contract         | Base Address                            | Bsc Address                             |
 |------------------|-----------------------------------------|-----------------------------------------|
