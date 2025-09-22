@@ -40,10 +40,10 @@ add deployment addresses bellow
 
 ## Mango Router functions
 In mango router everything starts with the **swap()** function.
---------------------------
-| Name | params |
---------------------------
-| swap | token0, token1, amountToSwap|
+
+```
+    function swap(address token0, address token1,uint256 amount,address referrer) external payable returns(uint amountOut)
+```
 
 
 #presaleContract
