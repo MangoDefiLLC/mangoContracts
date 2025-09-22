@@ -8,6 +8,7 @@ mango defi contracts are the bread and butter of mango echosystem.
 *Mango Toke* - ERC20 token wish is the token for the echosystem
 
 ## Roles
+
 *Owner* - owner can call specific function on referral contract and router. 
 - in Router we have the set referralContract wish allows owner to add a new referral contract, for the router to call the distribution of referral rewrds.
 - the owner also has special funcion in referral contract, like setting a router, to allow that router to call the distribute.
@@ -21,14 +22,28 @@ mango defi contracts are the bread and butter of mango echosystem.
 
 *TaxMan* - tax man is a wallet designates to get the fees from router, (this should be a msart contract, also taxman is not owner)
 
+
+
 add deployment addresses bellow
+
+
 ## Mango contracts
+
+| Contract         | Base Address                            | Bsc Address                             |
+|------------------|-----------------------------------------|-----------------------------------------|
+| MangoRouter002   | 0x157278d12dC2b5bd0cFbF860A64d092d486BfC99 | 0x71978719Fe4103B49bD3d7711eB22421f0410030  |
+| MangoReferral    | 0xDBe52cA974cF2593E7E05868dCC15385BD9ef35C | NA                                          |
+| MangoToken       | 0x5Ac57Bf5395058893C1a0f4250D301498DCB11fC | NA                                          |
+| MangoPresale     | 0x70c39AC1057211F4a4933e01A18e21e06d88E888 | NA                                          |
+| MangoAirdrop     | 0x9A80500c425739C4E48f05Bad7f9ddB0CAAe88f0 | NA                                          |
+
 
 #presaleContract
 #mangoTokenContracts
 
 #mango router 001
 ```
+0x157278d12dC2b5bd0cFbF860A64d092d486BfC99
 Deployer: 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17
 Deployed to: 0x7cdD5b8C4cA1cCBdC7c7D871046E2a471FA33e90
 Transaction hash: 0xcc85fed2bfd132fc7e0b1ad9022ddf02ffab5d71a19e87aa3820c3c8aa733122

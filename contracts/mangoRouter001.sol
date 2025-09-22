@@ -171,11 +171,12 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         uint256 amount,
         address referrer
     ) internal returns (bool) {
-        try mangoReferral.distributeReferralRewardsRewards(user, amount, referrer) {
-            return true;
-        } catch {
-            return false;
-        }
+        (bool s, ) = address(mangoReferral).call( 
+            abi.encodeWithSignature("distributeReferralRewardsRewards(address,uint256,address)",
+            user,
+            amount,
+            referrer));
+        return s;
     }
     function swap(address token0, address token1,uint256 amount,address referrer) external payable returns(uint amountOut){
         if(msg.value == 0 && amount == 0) revert BothCantBeZero();
@@ -323,7 +324,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         emit NewOwner(newOwner);
     }
     function setReferralContract(address referalAdd) public {
-        require(msg.sender == owner() || msg.sender == address(this));
+       if(msg.sender != owner()) revert NotOwner();
         mangoReferral = IMangoReferral(referalAdd);
     }
     function withdrawEth() external{
