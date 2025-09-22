@@ -14,13 +14,14 @@ mango defi contracts are the bread and butter of mango echosystem.
 - the owner also has special funcion in referral contract, like setting a router, to allow that router to call the distribute.
 - no one else should be able to call this function
 # Actors
-*User*(buyer or seller) - uses mango to swap tokens
+**User**(buyer or seller) - uses mango to swap tokens
 
-*router* - smart contract to route and execute swaps
+**router** - smart contract to route and execute swaps
 
-*Referral* - smart contract to handle referral distribution
+**Referral** - smart contract to handle referral distribution
+- The distribute and adding referral chain cant only be called by a valid router
 
-*TaxMan* - tax man is a wallet designates to get the fees from router, (this should be a msart contract, also taxman is not owner)
+**TaxMan** - tax man is a wallet designates to get the fees from router, (this should be a smart contract, also taxman is not owner)
 
 
 
