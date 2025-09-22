@@ -43,10 +43,10 @@ In mango router everything starts with the **swap()** function.
 
 ```
     function swap(
-        address token0,
-        address token1,
-        uint256 amount,
-        address referrer
+        address token0,//tokenIn
+        address token1,// tokenOut
+        uint256 amount,//amount to swap
+        address referrer //referrer address , address(0) if non
         ) external payable returns(uint amountOut)
 ```
 
