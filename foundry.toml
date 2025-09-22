@@ -1,6 +1,9 @@
 [profile.default]
 src = "src"
 out = "out"
+remappings = [
+      "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"
+    ]
 libs = ["lib"]
  evm_version = 'shanghai'
 

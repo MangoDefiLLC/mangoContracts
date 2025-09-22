@@ -164,6 +164,7 @@ contract MangoRouterSecure is ReentrancyGuard, Pausable, Ownable {
         
         // Calculate minimum amount out with slippage protection
         uint256 expectedAmountOut = _getExpectedAmountOut(path);
+        //E: THIS MINAMOUNT I CAN GET USING THE uniswap Qouter
         path.minAmountOut = expectedAmountOut.mul(BASIS_POINTS.sub(slippageTolerance)).div(BASIS_POINTS);
 
         // Find and execute swap

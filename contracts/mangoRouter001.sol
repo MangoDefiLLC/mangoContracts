@@ -62,7 +62,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         basisPoints = 10000
         //I WIll like to see how to make better the search of the pool
         //or jut route to a msart router
-        poolFees = [100,1000,basisPoints,20000,2500,300,3000,5000];
+        poolFees = [100,1000,basisPoints,20000,2500,taxFee,3000,5000];
         taxMan = msg.sender;//taxman is set to msg.sender until changed
         //ideally you want taxman to the the manager SMC
         setReferralContract(0xDBe52cA974cF2593E7E05868dCC15385BD9ef35C);
@@ -114,7 +114,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                 );
                 if(!success) revert EthUnwrapFailed();
                 //get amount to user after tax
-                amountToUser = _tax(amountOut);
+                amountToUser = _tax(amountOut);// amount to user after tax
 
                 //pay user its funds
                 _transferEth(msg.sedner,amountToUser);
@@ -122,7 +122,10 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                 //ones user is paid check if user has referral
                 if(data.referrer > address(0)){
                     uint256 referalPay = _referalFee(amountOut-amountToUser);//pass 3%
-                    mangoReferral.distributeReferralRewards(msg.sender,referalPay,data.referrer);
+                    //call distribute rewards on mango referral
+                    bool s = _distributeReferralRewards(msg.sender,referalPay,data.referrer);
+                    if(!s) revert CallDistributeFailed();
+
                     emit ReferralPayout(referalPay);
                     //pay tax man
                     uint256 taxManPay = (amountOut-amountToUser)-referalPay;
@@ -162,6 +165,17 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
             block.timestamp*200
         );
         return amount[1];
+    }
+    function _distributeReferralRewards(
+        address user,
+        uint256 amount,
+        address referrer
+    ) internal returns (bool) {
+        try mangoReferral.distributeReferralRewardsRewards(user, amount, referrer) {
+            return true;
+        } catch {
+            return false;
+        }
     }
     function swap(address token0, address token1,uint256 amount,address referrer) external payable returns(uint amountOut){
         if(msg.value == 0 && amount == 0) revert BothCantBeZero();
@@ -223,13 +237,14 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                 uint256 referralPay = _referalFee(totalPayOut);//GET THE 1% FOR THE REFERRAL
                 //E: THIS SNIPPET IS ONLU FOR NONE BASE
 
-                //call distribute rewards passing it referral pay
-                (bool s,) = address(mangoReferral).call(
-                    abi.encodeWithSignature(
-                    "distributeReferralRewards(address,uint256,address)",
-                    msg.sender,referralPay,path.referrer)
-                );
+                //call distribute rewards on mango referral
+                bool s = _distributeReferralRewards( 
+                    msg.sender,//user
+                    referralPay,//amount to pay
+                    path.referrer//address of referrer
+                    );
                 if(!s) revert CallDistributeFailed();
+                
 
                 emit ReferralPayout(referralPay);
                 _payTaxMan(totalPayOut-referralPay);
@@ -270,7 +285,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     //to collect eth on the way in on swap function
     
     function _ethToTokensV2(address token,uint256 amountIn) private returns(uint) {
-        if(msg.value == 0) revert('value cant be zero');
+        
         address[] memory path = new address[](2);
         path[0] = address(weth);
         path[1] = token;
@@ -303,22 +318,22 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     }
 
     function changeOwner(address newOwner) external {
-        if(msg.sender != owner) revert NotOwner();
-        owner = newOwner;
+        if(msg.sender != owner()) revert NotOwner();
+        _transferOwnership(newOwner);
         emit NewOwner(newOwner);
     }
     function setReferralContract(address referalAdd) public {
-        require(msg.sender == owner || msg.sender == address(this));
+        require(msg.sender == owner() || msg.sender == address(this));
         mangoReferral = IMangoReferral(referalAdd);
     }
     function withdrawEth() external{
-        if(msg.sender != owner) revert NotOwner();
+        if(msg.sender !=  owner()) revert NotOwner();
         bool s = _transferEth(msg.sedner,address(this).balance);
     }
     //THIS FUNCTION IS TO RESCUE TOKENS SENT BY MISTAKE TO THE CONTRACT
     //ONLY OWNER CAN CALL THIS FUNCTION
     function withdrawToken(address token) external {
-       if(msg.sender != owner) revert NotOwner();
+       if(msg.sender != owner()) revert NotOwner();
         uint256 amount = IERC20(token).balanceOf(address(this));
         require(IERC20(token).transfer(msg.sender,amount));
     }
