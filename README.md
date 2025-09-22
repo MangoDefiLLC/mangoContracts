@@ -38,6 +38,13 @@ add deployment addresses bellow
 | MangoPresale     | 0x70c39AC1057211F4a4933e01A18e21e06d88E888 | NA                                          |
 | MangoAirdrop     | 0x9A80500c425739C4E48f05Bad7f9ddB0CAAe88f0 | NA                                          |
 
+## Mango Router functions
+In mango router everything starts with the **swap()** function.
+--------------------------
+| Name | params |
+--------------------------
+| swap | token0, token1, amountToSwap|
+
 
 #presaleContract
 #mangoTokenContracts
