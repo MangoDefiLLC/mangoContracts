@@ -15,6 +15,8 @@ contract Mango_Manager is Ownable{
     using SafeMath for uint256;
 
     IMangoRouter public mangoRouter;
+    IERC20 public mangoToken;
+    IMangoReferral public mangoReferral;
 
     //fees commming in have to be separates in to 3 vars
     uint256 public teamFee;
@@ -28,12 +30,14 @@ contract Mango_Manager is Ownable{
 
     event FeesReceived(uint256 totalAmount, uint256 teamFee, uint256 buyAndBurnFee, uint256 referralFee);
 
-    constructor(address mangoRouter, address mangoReferral) Ownable(msg.sender){
+    constructor(address mangoRouter,
+        address mangoReferral,
+        address token
+        ) Ownable(msg.sender){
         mangoRouter = IMangoRouter(mangoRouter);
         mangoReferral = IMangoReferral(mangoReferral);
-
+        mangoToken = IERC20(token);
     }
-
 
     function burn(uint256 amount) external onlyOwner{
         _buyMango(amount);
