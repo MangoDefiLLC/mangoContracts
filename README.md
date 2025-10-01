@@ -3,9 +3,21 @@ mango defi contracts are the bread and butter of mango echosystem.
 
 *Mango Router* - router is the contract designe to interact with protocols like uniswap, pancake swap and aerodrome and perfomr swaps
 
-*Mango Referral* - the referral contract is desgine to distribute rewards to users when they swap via mango router. ( the distribute function can only be called ny a authorize router)
+*Mango Referral* - the referral contract is desgine to distribute rewards to users when they swap via mango router.( the distribute function can only be called ny a authorize router)
+    - *roles*
+    - *Owner* can call withdrawal, also call addReferralChain() of a user
+    (the add referral chain has to be added to be able to transfer users referreess from another contract)
+    - *Manager* is allow to call deposite token function in the referral
+
 
 *Mango Toke* - ERC20 token wish is the token for the echosystem
+
+*Mango Manager* - the manager is in charge of getting the 3% fee from the router
+    - *roles*
+    -Owner is able to call the external functions buyback and burs, and distribute
+    -router will send the fee amount , hasno other power in the contract or it should
+    -Token need to interact with token contract to call burning function
+    -Referral the manager should be able to MANGO and fund the referral contract
 
 ## Roles
 
