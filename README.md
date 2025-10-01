@@ -28,13 +28,10 @@ mango defi contracts are the bread and butter of mango echosystem.
 *TaxMan* - tax man is a wallet designates to get the fees from router, (this should be a smart contract, also taxman is not owner)
 # Actors
 |---------------------------------------------------------------|
-|**User**(buyer or seller)| uses mango to swap tokens           |
-|                                                                |
-|**router**  |smart contract to route and execute swaps.         |
-|                                                                 |
-|**Referral** | smart contract to handle referral distribution    |
+|**User**    |(buyer or seller)| uses mango to swap tokens    |
+|**router**  |smart contract to route and execute swaps.        |
+|**Referral** | smart contract to handle referral distribution   |
 |(The distribute and adding referral chain cant only be called by a valid router)|
-|                                                                        |
 |**TaxMan** | tax man is a wallet designates to get the fees from router |
                                                          
 ## Gettin started
