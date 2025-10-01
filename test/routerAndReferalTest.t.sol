@@ -14,6 +14,7 @@ import { IRouterV2 } from "../contracts/interfaces/IRouterV2.sol";
 import { IMangoReferral } from "../contracts/interfaces/IMangoReferral.sol";
 import { IWETH9 } from "../contracts/interfaces/IWETH9.sol";
 import { IMangoErrors } from "../contracts/interfaces/IMangoErrors.sol";
+import {IMangoStructs} from "../contracts/interfaces/IMangoStructs.sol";
 //import { ISwapRouter02} from "../contracts/interfaces/ISwapRouter02.sol";
 //import {IAllowanceTransfer} from '../permit2/src/interfaces/IAllowanceTransfer.sol';
 interface CheatCodes {
@@ -36,18 +37,11 @@ interface CheatCodes {
         returns (uint256 amountOut);
 }
 
-struct cParamsRouter {
-        IUniswapV2Factory factoryV2;
-        IUniswapV3Factory factoryV3;
-        IRouterV2 routerV2;
-        ISwapRouter02 swapRouter02;
-        IWETH9 weth;
-        uint256 taxFee;
-        uint256 referralFee;
-    }
+
 contract test_Router_and_Referal_Fork is Test {
     CheatCodes public cheatCodes;
-    IMangoRouter public mangoRouter;
+    IMangoRouter public ImangoRouter;
+    MangoRouter002 public mangoRouter;
     MANGO_DEFI_TOKEN public mangoToken;
     MangoReferral public  mangoReferral;
 
@@ -68,12 +62,8 @@ contract test_Router_and_Referal_Fork is Test {
 
     function setUp() public {
         //contracts deployment order
-        //router
-        //token
-        //referal
-        mangoRouter = IMangoRouter(0x59f91E149C435BDf0277A2e9e055345CA989D45D);//0xeE629d83e42564A17Ea50E34c2D2A121d5A6E911);
-        weth = 0x4200000000000000000000000000000000000006;
-        usdc = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
+
+       
         cheatCodes = CheatCodes(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
         seller = 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17;
 
@@ -82,7 +72,7 @@ contract test_Router_and_Referal_Fork is Test {
         baseFork = vm.createFork(BASE);
         sepoliaFork = vm.createFork(SEPOLIA);
         
-        mango = 0x5Ac57Bf5395058893C1a0f4250D301498DCB11fC;
+        //mango = 0x5Ac57Bf5395058893C1a0f4250D301498DCB11fC;
         // vm.startPrank(seller);
         // IERC20(mango).transfer(address(this),IERC20(mango).balanceOf(seller));
         // vm.stopPrank();
@@ -111,17 +101,18 @@ contract test_Router_and_Referal_Fork is Test {
     //SETUP TOKEN REFERRAL READY TO TEST
     function setEchosystemBase() public {
         //deploy router
-        cParamsRouter memory params = cParamsRouter(
-            IUniswapV2Factory(0xBCfCcbde45cE874adCB698cC183deBcF17952812),//factpryv2
-            IUniswapV3Factory(0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865),//factpry v3
-            IRouterV2(0x10ED43C718714eb63d5aA57B78B54704E256024E),//routerv2
-            ISwapRouter02(0x1b81D678ffb9C0263b24A97847620C99d213eB14),//swapRouter02
-            IWETH9(0x4200000000000000000000000000000000000006),//weth
+        IMangoStructs.cParamsRouter memory params = IMangoStructs.cParamsRouter(
+            //this is base 
+            0xBCfCcbde45cE874adCB698cC183deBcF17952812,//factpryv2
+            0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865,//factpry v3
+            0x10ED43C718714eb63d5aA57B78B54704E256024E,//routerv2
+            0x1b81D678ffb9C0263b24A97847620C99d213eB14,//swapRouter02
+            0x4200000000000000000000000000000000000006,//weth
             300,//taxFee
             100//fererralFee
         );
 
-
+        mangoRouter = new MangoRouter002(params);
     }
     //     function test_SwapAndDistribute_floor1_ethToTOken() external{
     //         (bool s,) = add1.call{value:1e18}("");

@@ -3,6 +3,7 @@ src = "src"
 out = "out"
 [rpc_endpoints]
 sepolia = "${SEPOLIA_RPC}"
+base="${BASE_RPC}"
 remappings = [
         "@openzeppelin/=lib/openzeppelin-contracts",
         "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts"

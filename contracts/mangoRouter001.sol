@@ -11,6 +11,7 @@ import { IRouterV2 } from "./interfaces/IRouterV2.sol";
 import { IMangoReferral } from "./interfaces/IMangoReferral.sol";
 import { IWETH9 } from "./interfaces/IWETH9.sol";
 import { IMangoErrors } from "./interfaces/IMangoErrors.sol";
+import {IMangoStructs} from "./interfaces/IMangoStructs.sol";
 
 interface ISwapRouter02 {
     struct ExactInputSingleParams {
@@ -65,25 +66,17 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     uint256 public taxFee;
 
     event NewOwner(address newOner);
-    struct contructorParams {
-        address factoryV2;
-        address factoryV3;
-        address routerV2;
-        address swapRouter02;
-        address weth;
-        uint256 taxFee;
-        uint256 referralFee;
-    }
-    constructor() Ownable(msg.sender) {
+   
+    constructor(IMangoStructs.cParamsRouter memory cParams) Ownable(msg.sender) {
         //owner = msg.sender;
-        factoryV2 = IUniswapV2Factory(0xBCfCcbde45cE874adCB698cC183deBcF17952812);
-        factoryV3 = IUniswapV3Factory(0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865);
-        routerV2 = IRouterV2(0x10ED43C718714eb63d5aA57B78B54704E256024E);
-        swapRouter02 = ISwapRouter02(0x1b81D678ffb9C0263b24A97847620C99d213eB14);//bsc
+        factoryV2 = IUniswapV2Factory(cParams.factoryV2);
+        factoryV3 = IUniswapV3Factory(cParams.factoryV3);
+        routerV2 =  IRouterV2(cParams.routerV2);
+        swapRouter02 = ISwapRouter02(cParams.swapRouter02);//bsc
         //ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
-        weth = IWETH9(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
-        taxFee = 300;//%3 in basis points
-        referralFee = 100;//1% in basis points
+        weth = IWETH9(cParams.weth);
+        taxFee = cParams.taxFee;//%3 in basis points
+        referralFee = cParams.referralFee;//1% in basis points
 
         //I WIll like to see how to make better the search of the pool
         //or jut route to a msart router
