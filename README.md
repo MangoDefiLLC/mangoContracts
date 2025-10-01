@@ -39,9 +39,12 @@ mango defi contracts are the bread and butter of mango echosystem.
                                                          
 ## Gettin started
 
+Make sure you have forge installed
+
 To get started with this repo
 ```
     git clone git@github.com:MangoDefiLLC/mangoContracts.git
+    forge install
 ```
 ## Run Test
 ```
