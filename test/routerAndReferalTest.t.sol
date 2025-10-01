@@ -5,21 +5,60 @@ pragma solidity ^0.8.13;
 import {Test, console} from "forge-std/Test.sol";
 import {IMangoRouter} from '../contracts/interfaces/IMangoRouter.sol';
 import {MangoRouter002} from "../contracts/mangoRouter001.sol";
-import {MANGO_DEFI} from "../contracts/mangoToken.sol";
+import {MANGO_DEFI_TOKEN} from "../contracts/mangoToken.sol";
 import{IERC20} from '../contracts/interfaces/IERC20.sol';
 import {MangoReferral} from '../contracts/mangoReferral.sol';
+import { IUniswapV2Factory } from "../contracts/interfaces/IUniswapV2Factory.sol";
+import { IUniswapV3Factory } from "../contracts/interfaces/IUniswapV3Factory.sol";
+import { IRouterV2 } from "../contracts/interfaces/IRouterV2.sol";
+import { IMangoReferral } from "../contracts/interfaces/IMangoReferral.sol";
+import { IWETH9 } from "../contracts/interfaces/IWETH9.sol";
+import { IMangoErrors } from "../contracts/interfaces/IMangoErrors.sol";
+//import { ISwapRouter02} from "../contracts/interfaces/ISwapRouter02.sol";
 //import {IAllowanceTransfer} from '../permit2/src/interfaces/IAllowanceTransfer.sol';
 interface CheatCodes {
            function prank(address) external;    
  }
-contract test_Router_and_Referal is Test {
+ interface ISwapRouter02 {
+    struct ExactInputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint24 fee;
+        address recipient;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+        uint160 sqrtPriceLimitX96;
+    }
+
+    function exactInputSingle(ExactInputSingleParams calldata params)
+        external
+        payable
+        returns (uint256 amountOut);
+}
+
+struct cParamsRouter {
+        IUniswapV2Factory factoryV2;
+        IUniswapV3Factory factoryV3;
+        IRouterV2 routerV2;
+        ISwapRouter02 swapRouter02;
+        IWETH9 weth;
+        uint256 taxFee;
+        uint256 referralFee;
+    }
+contract test_Router_and_Referal_Fork is Test {
     CheatCodes public cheatCodes;
     IMangoRouter public mangoRouter;
-    MANGO_DEFI public mangoToken;
+    MANGO_DEFI_TOKEN public mangoToken;
     MangoReferral public  mangoReferral;
+
+    string public BASE;
+    string public SEPOLIA;
     uint256 public amount;
     address public mango;
     address public seller;
+    uint256 public baseFork;
+    uint256 public sepoliaFork;
+
     //IAllowanceTransfer public permit2;
 
 
@@ -37,6 +76,11 @@ contract test_Router_and_Referal is Test {
         usdc = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
         cheatCodes = CheatCodes(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
         seller = 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17;
+
+        BASE = vm.envString("BASE_RPC");
+        SEPOLIA = vm.envString("SEPOLIA_RPC");
+        baseFork = vm.createFork(BASE);
+        sepoliaFork = vm.createFork(SEPOLIA);
         
         mango = 0x5Ac57Bf5395058893C1a0f4250D301498DCB11fC;
         // vm.startPrank(seller);
@@ -49,6 +93,36 @@ contract test_Router_and_Referal is Test {
         //mangoReferal = new MangoReferral(address(this),address(mangoRouter));//owner and router
     
         }
+        // create two _different_ forks during setup
+ 
+    // demonstrate fork ids are unique
+    function testForkIdDiffer() public {
+        assert(baseFork != sepoliaFork);
+    }
+ 
+    // select a specific fork
+    function testCanSelectFork() public {
+        // select the fork
+        vm.selectFork(baseFork);
+        assertEq(vm.activeFork(), baseFork);
+ 
+        // from here on data is fetched from the `mainnetFork` if the EVM requests it and written to the storage of `mainnetFork`
+    }
+    //SETUP TOKEN REFERRAL READY TO TEST
+    function setEchosystemBase() public {
+        //deploy router
+        cParamsRouter memory params = cParamsRouter(
+            IUniswapV2Factory(0xBCfCcbde45cE874adCB698cC183deBcF17952812),//factpryv2
+            IUniswapV3Factory(0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865),//factpry v3
+            IRouterV2(0x10ED43C718714eb63d5aA57B78B54704E256024E),//routerv2
+            ISwapRouter02(0x1b81D678ffb9C0263b24A97847620C99d213eB14),//swapRouter02
+            IWETH9(0x4200000000000000000000000000000000000006),//weth
+            300,//taxFee
+            100//fererralFee
+        );
+
+
+    }
     //     function test_SwapAndDistribute_floor1_ethToTOken() external{
     //         (bool s,) = add1.call{value:1e18}("");
     //         uint256 ethBalanceBeforeSwap = address(this).balance;

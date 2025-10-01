@@ -10,6 +10,7 @@ import { IUniswapV3Factory } from "./interfaces/IUniswapV3Factory.sol";
 import { IRouterV2 } from "./interfaces/IRouterV2.sol";
 import { IMangoReferral } from "./interfaces/IMangoReferral.sol";
 import { IWETH9 } from "./interfaces/IWETH9.sol";
+import { IMangoErrors } from "./interfaces/IMangoErrors.sol";
 
 interface ISwapRouter02 {
     struct ExactInputSingleParams {
@@ -31,12 +32,6 @@ interface ISwapRouter02 {
 //import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 //@DEV this is the first version of the MAngo router
 contract MangoRouter002 is ReentrancyGuard, Ownable {
-    error TransferFailed();
-    error BothCantBeZero();
-    error NotOwner();
-    error EthUnwrapFailed();
-    error ValueIsZero();
-    error  CallDistributeFailed();
 
     IUniswapV2Factory public immutable factoryV2;
     IUniswapV3Factory public immutable factoryV3;
@@ -70,6 +65,15 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     uint256 public taxFee;
 
     event NewOwner(address newOner);
+    struct contructorParams {
+        address factoryV2;
+        address factoryV3;
+        address routerV2;
+        address swapRouter02;
+        address weth;
+        uint256 taxFee;
+        uint256 referralFee;
+    }
     constructor() Ownable(msg.sender) {
         //owner = msg.sender;
         factoryV2 = IUniswapV2Factory(0xBCfCcbde45cE874adCB698cC183deBcF17952812);
@@ -89,12 +93,12 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         setReferralContract(0xDBe52cA974cF2593E7E05868dCC15385BD9ef35C);
     }
     function changeTaxMan(address newTaxMan) external {
-        if(msg.sender != owner()) revert NotOwner();
+        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         taxMan = newTaxMan;
     }
     function _transferEth(address receiver,uint256 amount) internal{
         (bool s,) = receiver.call{value:amount}("");
-        if(s != true) revert TransferFailed();
+        if(s != true) revert IMangoErrors.TransferFailed();
     }
     function _tax(uint256 _amount) private view returns(uint256 amount){
         uint256 taxAmount = (_amount * taxFee)/basisPoints;
@@ -133,7 +137,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                   (bool success, ) = address(weth).call(
                     abi.encodeWithSignature("withdraw(uint256)", amountOut)
                 );
-                if(!success) revert EthUnwrapFailed();
+                if(!success) revert IMangoErrors.EthUnwrapFailed();
                 //get amount to user after tax
                 amountToUser = _tax(amountOut);// amount to user after tax
 
@@ -145,7 +149,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                     uint256 referalPay = _referalFee(amountOut-amountToUser);//pass 3%
                     //call distribute rewards on mango referral
                     bool s = _distributeReferralRewards(msg.sender,referalPay,data.referrer);
-                    if(!s) revert CallDistributeFailed();
+                    if(!s) revert IMangoErrors.CallDistributeFailed();
 
                     emit ReferralPayout(referalPay);
                     //pay tax man
@@ -200,14 +204,14 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         return s;
     }
     function swap(address token0, address token1,uint256 amount,address referrer) external payable returns(uint amountOut){
-        if(msg.value == 0 && amount == 0) revert BothCantBeZero();
-        if(msg.value > 0 && amount > 0) revert BothCantBeZero();
+        if(msg.value == 0 && amount == 0) revert IMangoErrors.BothCantBeZero();
+        if(msg.value > 0 && amount > 0) revert IMangoErrors.BothCantBeZero();
          //if swapping eth msg.value cant be zero
-        if(token0 == address(0) && msg.value == 0) revert ValueIsZero();
+        if(token0 == address(0) && msg.value == 0) revert IMangoErrors.ValueIsZero();
         //when swapping tokens the amount param cant be 0
-        if(token1 == address(0) && amount == 0) revert ValueIsZero();
+        if(token1 == address(0) && amount == 0) revert IMangoErrors.ValueIsZero();
         //both tokens cant be 0
-        if(token0 == address(0) && token1 == address(0)) revert BothCantBeZero();
+        if(token0 == address(0) && token1 == address(0)) revert IMangoErrors.BothCantBeZero();
     
         Path memory path;
         
@@ -265,7 +269,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                     referralPay,//amount to pay
                     path.referrer//address of referrer
                     );
-                if(!s) revert CallDistributeFailed();
+                if(!s) revert IMangoErrors.CallDistributeFailed();
                 
 
                 emit ReferralPayout(referralPay);
@@ -340,22 +344,22 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     }
 
     function changeOwner(address newOwner) external {
-        if(msg.sender != owner()) revert NotOwner();
+        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         _transferOwnership(newOwner);
         emit NewOwner(newOwner);
     }
     function setReferralContract(address referalAdd) public {
-       if(msg.sender != owner()) revert NotOwner();
+       if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         mangoReferral = IMangoReferral(referalAdd);
     }
     function withdrawEth() external{
-        if(msg.sender !=  owner()) revert NotOwner();
+        if(msg.sender !=  owner()) revert IMangoErrors.NotOwner();
         _transferEth(msg.sender,address(this).balance);
     }
     //THIS FUNCTION IS TO RESCUE TOKENS SENT BY MISTAKE TO THE CONTRACT
     //ONLY OWNER CAN CALL THIS FUNCTION
     function withdrawToken(address token) external {
-       if(msg.sender != owner()) revert NotOwner();
+       if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         uint256 amount = IERC20(token).balanceOf(address(this));
         require(IERC20(token).transfer(msg.sender,amount));
     }

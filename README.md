@@ -73,7 +73,12 @@ In mango router everything starts with the **swap()** function.
         address referrer //referrer address , address(0) if non
         ) external payable returns(uint amountOut)
 ```
+ - ETH-> token swap, token0 needs to be address(0)
+ - Token->Eth swap, token1 needs to be address(0)
 
+ we take the same aproach as uniswap, as if token 0 is empty we assume tokenIn is eth and msg.value cannot be 0,
+ as you cannot swap eth with out sending a amount
+ - for *Token* to *Eth* swap the *msg.value* has to be 0, and amountIn cannot be 0, as if both amount are 0 transaction will revert
 
 #presaleContract
 #mangoTokenContracts

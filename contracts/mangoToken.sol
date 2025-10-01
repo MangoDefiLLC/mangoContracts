@@ -31,10 +31,11 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
     
         taxWallet = msg.sender;
         uniswapRouterV2 = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;//uniswap v2 router
-        isExcludedFromTax[owner] = true;
+        isExcludedFromTax[msg.sender] = true;
         isExcludedFromTax[address(this)] = true;
         isExcludedFromTax[uniswapRouterV2] = true;
     }
+    //**THE TAXES FOR THIS IS DESIGNE FOR V2, V3 NEEDS TO BE ADDED AND TESTED */
 
     function addPair(address pair) external onlyOwner {
         require(pair != address(0), "Invalid pair address");
@@ -53,10 +54,10 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
         if (!isExcludedFromTax[from] && !isExcludedFromTax[to]) {
             if (isPair[to]) {
                 // Sell
-                taxAmount = (amount.mul(sellTax)).div(10000);
+                taxAmount = (amount*sellTax)/10000;
             } else if (isPair[from]) {
                 // Buy
-                taxAmount = (amount.mul(buyTax)).div(10000);
+                taxAmount = (amount*buyTax)/10000;
             }
         }
 
@@ -67,7 +68,8 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
             super._transfer(from, taxWallet, taxAmount);
         }
     }
-    function setTaxes(uint256 _buyTax, uint256 _sellTax) external onlyOwner {
+    function setTaxes(uint256 _buyTax, uint256 _sellTax) external {
+        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         require(_buyTax <= 300 && _sellTax <= 300, "Max tax is 3%");
         buyTax = _buyTax;
         sellTax = _sellTax;
@@ -75,16 +77,16 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
     }
 
     function setTaxWallet(address _taxWallet) external {
-        if(msg.sender != owner()) revert NotOwner();
+        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         require(_taxWallet != address(0), "Zero address not allowed");
         taxWallet = _taxWallet;
         emit TaxWalletUpdated(_taxWallet);
     }
 
     function changeOwner(address _newOwner) external {
-        if(msg.sender != owner()) revert NotOwner();
+        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         require(_newOwner != address(0), "Zero address not allowed");
-        owner = _newOwner;
+        transferOwnership(_newOwner);
         emit NewOwner(_newOwner);
     }
 }
