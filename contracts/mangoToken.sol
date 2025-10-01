@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./interfaces/ERC20.sol";
-
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IMangoErrors} from './interfaces/IMangoErrors.sol';
 interface IUniswapV2Router02 {
     function factory() external pure returns (address);
     function WETH() external pure returns (address);
 }
+    
+contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
 
-contract MANGO_DEFI is ERC20 {
-    address public owner;
     uint256 public buyTax = 200;  // 2% in basis points (BPS)
     uint256 public sellTax = 300; // 3% in basis points (BPS)
     address public uniswapRouterV2;
@@ -23,15 +25,10 @@ contract MANGO_DEFI is ERC20 {
     event PairAdded(address pair);
     event NewOwner(address newOwner);
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Not authorized");
-        _;
-    }
-
-    constructor() ERC20("MANGO DEFI", "MANGO") {
-        uint256 initialSupply = 100_000_000_000e18;
-        _mint(msg.sender, initialSupply);
-        owner = msg.sender;
+    constructor(uint256 totalSupply) Ownable(msg.sender) ERC20("MANGO DEFI", "MANGO") {
+     
+        _mint(msg.sender, totalSupply);
+    
         taxWallet = msg.sender;
         uniswapRouterV2 = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;//uniswap v2 router
         isExcludedFromTax[owner] = true;
@@ -50,17 +47,16 @@ contract MANGO_DEFI is ERC20 {
         return true;
     }
 
-
     function _transfer(address from, address to, uint256 amount) internal override {
         uint256 taxAmount = 0;
 
         if (!isExcludedFromTax[from] && !isExcludedFromTax[to]) {
             if (isPair[to]) {
                 // Sell
-                taxAmount = (amount * sellTax) / 10000;
+                taxAmount = (amount.mul(sellTax)).div(10000);
             } else if (isPair[from]) {
                 // Buy
-                taxAmount = (amount * buyTax) / 10000;
+                taxAmount = (amount.mul(buyTax)).div(10000);
             }
         }
 
@@ -78,13 +74,15 @@ contract MANGO_DEFI is ERC20 {
         emit TaxesUpdated(_buyTax, _sellTax);
     }
 
-    function setTaxWallet(address _taxWallet) external onlyOwner {
+    function setTaxWallet(address _taxWallet) external {
+        if(msg.sender != owner()) revert NotOwner();
         require(_taxWallet != address(0), "Zero address not allowed");
         taxWallet = _taxWallet;
         emit TaxWalletUpdated(_taxWallet);
     }
 
-    function changeOwner(address _newOwner) external onlyOwner {
+    function changeOwner(address _newOwner) external {
+        if(msg.sender != owner()) revert NotOwner();
         require(_newOwner != address(0), "Zero address not allowed");
         owner = _newOwner;
         emit NewOwner(_newOwner);

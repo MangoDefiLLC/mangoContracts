@@ -2,31 +2,52 @@
 pragma solidity ^0.8.20;
 //import {IUniversalRouter} from './interfaces/IUniversalRouter.sol';
 
-import {IRouterV2} from './interfaces/IRouterV2.sol';
-import {ISwapRouter02} from './interfaces/ISwapRouter02.sol';
-import {IWETH9} from './interfaces/IWETH9.sol';
-import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import {IMangoReferral} from './interfaces/IMangoReferral.sol';
-import {IUniswapV3Factory } from './interfaces/IUniswapV3Factory.sol';
-import {IUniswapV2Factory } from './interfaces/IUniswapV2Factory.sol';
-import {MangoReferral} from "./mangoReferral.sol";
-import {ReentrancyGuard} from '@openzeppelin/contracts/security/ReentrancyGuard.sol';
-import {Pausable} from '@openzeppelin/contracts/security/Pausable.sol';
-import {Ownable} from '@openzeppelin/contracts/access/Ownable.sol';z
-import {IMangoErrors} from './interfaces/IMangoErrors.sol';
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
+import { IUniswapV3Factory } from "./interfaces/IUniswapV3Factory.sol";
+import { IRouterV2 } from "./interfaces/IRouterV2.sol";
+import { IMangoReferral } from "./interfaces/IMangoReferral.sol";
+import { IWETH9 } from "./interfaces/IWETH9.sol";
 
+interface ISwapRouter02 {
+    struct ExactInputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint24 fee;
+        address recipient;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+        uint160 sqrtPriceLimitX96;
+    }
+
+    function exactInputSingle(ExactInputSingleParams calldata params)
+        external
+        payable
+        returns (uint256 amountOut);
+}
+
+//import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 //@DEV this is the first version of the MAngo router
 contract MangoRouter002 is ReentrancyGuard, Ownable {
+    error TransferFailed();
+    error BothCantBeZero();
+    error NotOwner();
+    error EthUnwrapFailed();
+    error ValueIsZero();
+    error  CallDistributeFailed();
 
     IUniswapV2Factory public immutable factoryV2;
     IUniswapV3Factory public immutable factoryV3;
     IMangoReferral public  mangoReferral;
     ISwapRouter02 public immutable swapRouter02;
+
     IRouterV2 public immutable routerV2;
     IWETH9 public immutable weth;
     address public taxMan; //receiver of the tax
     uint256 public  referralFee;
-    uint256 public constant basisPoints;;
+    uint256 public constant basisPoints =  10000;
 
     struct Path {
         address token0;
@@ -45,8 +66,8 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
 
     event ReferralPayout(uint256 amountToReferral);
    
-    uint24[] public poolFees;
-    uint24 public taxFee;
+    uint256[] public poolFees;
+    uint256 public taxFee;
 
     event NewOwner(address newOner);
     constructor() Ownable(msg.sender) {
@@ -59,10 +80,10 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         weth = IWETH9(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
         taxFee = 300;//%3 in basis points
         referralFee = 100;//1% in basis points
-        basisPoints = 10000
+
         //I WIll like to see how to make better the search of the pool
         //or jut route to a msart router
-        poolFees = [100,1000,basisPoints,20000,2500,taxFee,3000,5000];
+        poolFees = [100,1000,10000,20000,2500,taxFee,3000,5000];
         taxMan = msg.sender;//taxman is set to msg.sender until changed
         //ideally you want taxman to the the manager SMC
         setReferralContract(0xDBe52cA974cF2593E7E05868dCC15385BD9ef35C);
@@ -72,15 +93,15 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         taxMan = newTaxMan;
     }
     function _transferEth(address receiver,uint256 amount) internal{
-        (s,) = receiver.call{value:amount}("");
+        (bool s,) = receiver.call{value:amount}("");
         if(s != true) revert TransferFailed();
     }
     function _tax(uint256 _amount) private view returns(uint256 amount){
-        uint256 taxAmount = _amount * taxFee / basisPoints;
+        uint256 taxAmount = (_amount * taxFee)/basisPoints;
         amount = _amount - taxAmount;//amount is the amount to user de rest is the fee
     }
      function _referalFee(uint256 amount) private view returns (uint256 referalPay){//this amount is the 3% for taxMan
-        referalPay = (amount * referralFee) / basisPoints; 
+        referalPay = (amount*referralFee)/basisPoints; 
     }
     function _payTaxMan(uint256 amount) private {
         _transferEth(taxMan,amount);
@@ -117,7 +138,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                 amountToUser = _tax(amountOut);// amount to user after tax
 
                 //pay user its funds
-                _transferEth(msg.sedner,amountToUser);
+                _transferEth(msg.sender,amountToUser);
                 
                 //ones user is paid check if user has referral
                 if(data.referrer > address(0)){
@@ -203,10 +224,10 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                 pair = factoryV3.getPool(
                     token0  == address(0) ? address(weth):token0,
                     token1 == address(0) ? address(weth) : token1,
-                    poolFees[i]
+                    uint24(poolFees[i])//uniswap get a uint24 and my array has uint256 so i need to cast it
                 );
                 if(pair > address(0)){
-                    path.poolFee = poolFees[i];
+                    path.poolFee = uint24(poolFees[i]);
                     found = true;
                     break;
                 }
@@ -329,7 +350,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     }
     function withdrawEth() external{
         if(msg.sender !=  owner()) revert NotOwner();
-        bool s = _transferEth(msg.sedner,address(this).balance);
+        _transferEth(msg.sender,address(this).balance);
     }
     //THIS FUNCTION IS TO RESCUE TOKENS SENT BY MISTAKE TO THE CONTRACT
     //ONLY OWNER CAN CALL THIS FUNCTION

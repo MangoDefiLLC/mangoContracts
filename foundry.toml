@@ -2,7 +2,8 @@
 src = "src"
 out = "out"
 remappings = [
-      "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"
+        "@openzeppelin/=lib/openzeppelin-contracts",
+        "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts"
     ]
 libs = ["lib"]
  evm_version = 'shanghai'
