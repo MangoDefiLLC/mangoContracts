@@ -61,6 +61,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     event Amount(uint256,uint256);
 
     event ReferralPayout(uint256 amountToReferral);
+    event payTaxMan(uint256 amountToTaxMan);
    
     uint256[] public poolFees;
     uint256 public taxFee;
@@ -101,6 +102,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     }
     function _payTaxMan(uint256 amount) private {
         _transferEth(taxMan,amount);
+        emit payTaxMan(amount);
     }
     function _swap(Path memory data) private returns(uint256 amountOut){
         uint256  amountToUser;

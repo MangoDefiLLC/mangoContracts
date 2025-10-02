@@ -53,6 +53,8 @@ contract test_Router_and_Referal_Fork is Test {
     uint256 public baseFork;
     uint256 public sepoliaFork;
 
+    address public taxMan = address(0x01);
+
     //IAllowanceTransfer public permit2;
 
 
@@ -71,7 +73,7 @@ contract test_Router_and_Referal_Fork is Test {
         BASE = vm.envString("BASE_RPC");
         SEPOLIA = vm.envString("SEPOLIA_RPC");
         baseFork = vm.createFork(BASE);
-       // sepoliaFork = vm.createFork(SEPOLIA);
+       sepoliaFork = vm.createFork(SEPOLIA);
         
         //mango = 0x5Ac57Bf5395058893C1a0f4250D301498DCB11fC;
         // vm.startPrank(seller);
@@ -108,14 +110,23 @@ contract test_Router_and_Referal_Fork is Test {
         //deploy router
         IMangoStructs.cParamsRouter memory params = IMangoStructs.cParamsRouter(
             //this is base 
+            0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6,//factpryv2
+            0x33128a8fC17869897dcE68Ed026d694621f6FDfD,//factpry v3
+            0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24,//routerv2
+            0x2626664c2603336E57B271c5C0b26F421741e481,//swapRouter02
+            0x4200000000000000000000000000000000000006,//weth
+            300,//taxFee
+            100//fererralFee
+        );
+        /**
+         //this is BSC
             0xBCfCcbde45cE874adCB698cC183deBcF17952812,//factpryv2
             0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865,//factpry v3
             0x10ED43C718714eb63d5aA57B78B54704E256024E,//routerv2
             0x1b81D678ffb9C0263b24A97847620C99d213eB14,//swapRouter02
             0x4200000000000000000000000000000000000006,//weth
             300,//taxFee
-            100//fererralFee
-        );
+            100//fererralFee */
 
         mangoRouter = new MangoRouter002(params);
         console.log('Router Address:',address(mangoRouter));
@@ -138,14 +149,22 @@ contract test_Router_and_Referal_Fork is Test {
 
         //validate router to call referral
         mangoReferral.addRouter(address(mangoRouter));
+        //add tax man
+        mangoRouter.changeTaxMan(taxMan);
     }
     function test_simpleEthTokenSwap() external {
+        //check for taxman balance before and after
+        uint256 taxManBalanceBefore = taxMan.balance;
+
         mangoRouter.swap{value:1e18}(
             address(0),
             usdc,
             0,
             address(0)
         );
+
+        uint256 taxManBalanceAfter = taxMan.balance;
+        assertEq((1e18*300)/10000, taxManBalanceAfter-taxManBalanceBefore,'taxman getting wrong fee amount');
     }
     //     function test_SwapAndDistribute_floor1_ethToTOken() external{
     //         (bool s,) = add1.call{value:1e18}("");
