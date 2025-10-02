@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 import {IMangoRouter} from '../contracts/interfaces/IMangoRouter.sol';
-import {IERC20} from '@openzeppelin/contracts/interfaces/IERC20.sol';
+import {MANGO_DEFI_TOKEN} from '../contracts/mangoToken.sol';
 import {IMangoReferral} from '../contracts/interfaces/IMangoReferral.sol';
-import {Ownable} from '@openzeppelin/contracts/access/Ownable.sol';
+import '@openzeppelin/contracts/access/Ownable.sol';
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 /**THIS MODULE IS MENT TO MANAGE FEES FROM MANGO ROUTER AND TOKENS TAX
@@ -15,7 +15,7 @@ contract Mango_Manager is Ownable{
     using SafeMath for uint256;
 
     IMangoRouter public mangoRouter;
-    IERC20 public mangoToken;
+    MANGO_DEFI_TOKEN public mangoToken;
     IMangoReferral public mangoReferral;
 
     //fees commming in have to be separates in to 3 vars
@@ -28,53 +28,51 @@ contract Mango_Manager is Ownable{
     error NotOwner();
     error SwapFailed();
 
-    event FeesReceived(uint256 totalAmount, uint256 teamFee, uint256 buyAndBurnFee, uint256 referralFee);
+    event FeesReceived(uint256 totalAmount);
 
-    constructor(address mangoRouter,
-        address mangoReferral,
-        address token
-        ) Ownable(msg.sender){
-        mangoRouter = IMangoRouter(mangoRouter);
-        mangoReferral = IMangoReferral(mangoReferral);
-        mangoToken = IERC20(token);
+    constructor(
+        address _mangoRouter,
+        address _mangoReferral,
+        address _token
+        ) Ownable(){
+        mangoRouter = IMangoRouter(_mangoRouter);
+        mangoReferral = IMangoReferral(_mangoReferral);
+        mangoToken = IERC20(_token);
     }
 
     function burn(uint256 amount) external onlyOwner{
         if(amount > buyAndBurnFee) revert();
         _buyMango(amount);
         //call the burn function in the erc20 token contract
+        mangoToken.burn(amount);
+        //this are calculated in eth
+        buyAndBurnFee -= amount;
+        totalBurned += amount;
     }
     //BUY MANGO IS NEEDED TO BUY AND BURN ,
     //ALSO TO BUY AND SEND MANGO TO REFERRAL
     //NOTE THE BUY MANGO SUBS TO THE BUY AND BUT AMOUN
     // WHAT IF IM BUYING TO REFERRAL,?
-    function _buyMango(uint256 amount) private {
+    function _buyMango(uint256 amount) private returns(uint256){
         //making a low level call to foward al gass fees
-        (bool s) = address(mangoRouter).call{value:amount}(
-            abi.encodeWithSignature("swap(address,address,uint256,address)",address(0),mangoToken,0,address(0))
+        (bool s,) = address(mangoRouter).call{value:amount}(
+            abi.encodeWithSignature("swap(address,address,uint256,address)",address(0),address(mangoToken),0,address(0))
         );
         if(!s) revert SwapFailed();
-        // this values are in ether
-        buyAndBurnFee -= amount;
-        totalBurned += amount;
     }
 
     //of the amount comming in is the 3% fee wish is divided by 3 (1% each)
     function _setFees(uint256 amount) private {
-        uint256 fee = (amount*1000) / 3 / 1000;
+        uint256 fee = (amount*10000) / 3 / 10000;
         teamFee = fee;
         buyAndBurnFee = fee;
         referralFee = fee;
         // // Final check
         //assert(teamFee + buyAndBurnFee + referralFee == amount);
     }
-    function _receive(uint256 amount) private payable {
-        totalFeesCollected += amount;
-        _setFees(amount);
-        emit FeesReceived(amount, teamFee, buyAndBurnFee, referralFee);
+    receive() external payable {
+        totalFeesCollected += msg.value;
+        _setFees(msg.value);
+        emit FeesReceived(msg.value);
     }
-    fallback() external payable {
-        _receive(msg.value);
-    }
-
 }
