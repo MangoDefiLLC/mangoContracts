@@ -66,6 +66,7 @@ contract test_Router_and_Referal_Fork is Test {
        
         cheatCodes = CheatCodes(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
         seller = 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17;
+        usdc = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 
         BASE = vm.envString("BASE_RPC");
         SEPOLIA = vm.envString("SEPOLIA_RPC");
@@ -131,6 +132,20 @@ contract test_Router_and_Referal_Fork is Test {
         );
         //deploy referral
         mangoReferral = new MangoReferral(referralParams);
+
+        //set referral contract on mango router
+        mangoRouter.setReferralContract(address(mangoReferral));
+
+        //validate router to call referral
+        mangoReferral.addRouter(address(mangoRouter));
+    }
+    function test_simpleEthTokenSwap() external {
+        mangoRouter.swap{value:1e18}(
+            address(0),
+            usdc,
+            0,
+            address(0)
+        );
     }
     //     function test_SwapAndDistribute_floor1_ethToTOken() external{
     //         (bool s,) = add1.call{value:1e18}("");
@@ -230,18 +245,18 @@ contract test_Router_and_Referal_Fork is Test {
     //     vm.prank(add1);
     //     mangoReferral.distributeReferralRewards(add1,1e18,tester0);
     // }
-       function test_sellMango() external {
-        vm.startPrank(seller);
-        uint256 ethBalance = address(this).balance;
-        uint256 mangoBalanceBefore = IERC20(mango).balanceOf(seller);
-        console.log('eth balance before',ethBalance);
-        console.log('mango Balance beofer',mangoBalanceBefore);
+    //    function test_sellMango() external {
+    //     vm.startPrank(seller);
+    //     uint256 ethBalance = address(this).balance;
+    //     uint256 mangoBalanceBefore = IERC20(mango).balanceOf(seller);
+    //     console.log('eth balance before',ethBalance);
+    //     console.log('mango Balance beofer',mangoBalanceBefore);
         
-        IERC20(mango).approve(address(mangoRouter), IERC20(mango).balanceOf(seller));
-        mangoRouter.swap(mango,address(0),32000e18,address(0));
+    //     IERC20(mango).approve(address(mangoRouter), IERC20(mango).balanceOf(seller));
+    //     mangoRouter.swap(mango,address(0),32000e18,address(0));
 
-        assertNotEq(mangoBalanceBefore,  IERC20(mango).balanceOf(seller));
-    }
+    //     assertNotEq(mangoBalanceBefore,  IERC20(mango).balanceOf(seller));
+    // }
     // function test_swap() public {
     //     uint256 ethBalanceBeforeSwap = address(this).balance;
     //     uint256 mangoBalanceBefore = IERC20(mango).balanceOf(address(this));

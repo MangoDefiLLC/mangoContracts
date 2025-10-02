@@ -40,13 +40,15 @@ contract Mango_Manager is Ownable{
     }
 
     function burn(uint256 amount) external onlyOwner{
+        if(amount > buyAndBurnFee) revert();
         _buyMango(amount);
         //call the burn function in the erc20 token contract
     }
     //BUY MANGO IS NEEDED TO BUY AND BURN ,
     //ALSO TO BUY AND SEND MANGO TO REFERRAL
+    //NOTE THE BUY MANGO SUBS TO THE BUY AND BUT AMOUN
+    // WHAT IF IM BUYING TO REFERRAL,?
     function _buyMango(uint256 amount) private {
-
         //making a low level call to foward al gass fees
         (bool s) = address(mangoRouter).call{value:amount}(
             abi.encodeWithSignature("swap(address,address,uint256,address)",address(0),mangoToken,0,address(0))
@@ -55,12 +57,11 @@ contract Mango_Manager is Ownable{
         // this values are in ether
         buyAndBurnFee -= amount;
         totalBurned += amount;
-       // mangoRouter.swap{value:buyAndBurnFee}(address(0), address(mangoToken),0,address(0));
     }
 
     //of the amount comming in is the 3% fee wish is divided by 3 (1% each)
     function _setFees(uint256 amount) private {
-        uint256 fee = (amount.mul(1000)).div(3).div(1000);
+        uint256 fee = (amount*1000) / 3 / 1000;
         teamFee = fee;
         buyAndBurnFee = fee;
         referralFee = fee;
