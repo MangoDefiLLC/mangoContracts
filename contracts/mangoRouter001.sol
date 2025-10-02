@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 //import {IUniversalRouter} from './interfaces/IUniversalRouter.sol';
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
 import { IUniswapV3Factory } from "./interfaces/IUniswapV3Factory.sol";
@@ -67,7 +67,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
 
     event NewOwner(address newOner);
    
-    constructor(IMangoStructs.cParamsRouter memory cParams) Ownable(msg.sender) {
+    constructor(IMangoStructs.cParamsRouter memory cParams) Ownable() {
         //owner = msg.sender;
         factoryV2 = IUniswapV2Factory(cParams.factoryV2);
         factoryV3 = IUniswapV3Factory(cParams.factoryV3);
@@ -83,7 +83,6 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         poolFees = [100,1000,10000,20000,2500,taxFee,3000,5000];
         taxMan = msg.sender;//taxman is set to msg.sender until changed
         //ideally you want taxman to the the manager SMC
-        setReferralContract(0xDBe52cA974cF2593E7E05868dCC15385BD9ef35C);
     }
     function changeTaxMan(address newTaxMan) external {
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
@@ -341,7 +340,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         _transferOwnership(newOwner);
         emit NewOwner(newOwner);
     }
-    function setReferralContract(address referalAdd) public {
+    function setReferralContract(address referalAdd) external {
        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         mangoReferral = IMangoReferral(referalAdd);
     }

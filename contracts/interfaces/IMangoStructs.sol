@@ -11,4 +11,11 @@ interface IMangoStructs{
         uint256 taxFee;
         uint256 referralFee;
     }
+    struct cReferralParams {
+        address mangoRouter;
+        address mangoToken;
+        address routerV2;
+        address weth;
+    }
+
 }

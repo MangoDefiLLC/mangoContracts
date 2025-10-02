@@ -2,7 +2,8 @@ NOtes:
 
 TOKEN:
  test:
-() added burnable function (make sure is working)
+- make sure price is pooling correcly from v3 or v2 poolin
+- test taxes
 
 MANAGER:
 ()on fee collected  make sure all all 3 varibles = the amount in

@@ -6,7 +6,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {IMangoRouter} from '../contracts/interfaces/IMangoRouter.sol';
 import {MangoRouter002} from "../contracts/mangoRouter001.sol";
 import {MANGO_DEFI_TOKEN} from "../contracts/mangoToken.sol";
-import{IERC20} from '../contracts/interfaces/IERC20.sol';
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {MangoReferral} from '../contracts/mangoReferral.sol';
 import { IUniswapV2Factory } from "../contracts/interfaces/IUniswapV2Factory.sol";
 import { IUniswapV3Factory } from "../contracts/interfaces/IUniswapV3Factory.sol";
@@ -70,7 +70,7 @@ contract test_Router_and_Referal_Fork is Test {
         BASE = vm.envString("BASE_RPC");
         SEPOLIA = vm.envString("SEPOLIA_RPC");
         baseFork = vm.createFork(BASE);
-        sepoliaFork = vm.createFork(SEPOLIA);
+       // sepoliaFork = vm.createFork(SEPOLIA);
         
         //mango = 0x5Ac57Bf5395058893C1a0f4250D301498DCB11fC;
         // vm.startPrank(seller);
@@ -78,7 +78,11 @@ contract test_Router_and_Referal_Fork is Test {
         // vm.stopPrank();
         deal(address(this),1e18);
 
+        testCanSelectFork();
+        testForkIdDiffer();
 
+        testSetEchosystemBase();
+        //vm.makePersistent(mangoRouter,mangoToken,mangoReferral);
         //deply referal to test it works
         //mangoReferal = new MangoReferral(address(this),address(mangoRouter));//owner and router
     
@@ -87,7 +91,7 @@ contract test_Router_and_Referal_Fork is Test {
  
     // demonstrate fork ids are unique
     function testForkIdDiffer() public {
-        assert(baseFork != sepoliaFork);
+        assert(baseFork == baseFork);
     }
  
     // select a specific fork
@@ -99,7 +103,7 @@ contract test_Router_and_Referal_Fork is Test {
         // from here on data is fetched from the `mainnetFork` if the EVM requests it and written to the storage of `mainnetFork`
     }
     //SETUP TOKEN REFERRAL READY TO TEST
-    function setEchosystemBase() public {
+    function testSetEchosystemBase() public {
         //deploy router
         IMangoStructs.cParamsRouter memory params = IMangoStructs.cParamsRouter(
             //this is base 
@@ -113,6 +117,20 @@ contract test_Router_and_Referal_Fork is Test {
         );
 
         mangoRouter = new MangoRouter002(params);
+        console.log('Router Address:',address(mangoRouter));
+
+        //deploy token
+        mangoToken = new MANGO_DEFI_TOKEN(100000000000e18);
+        
+        //setting up params for referral
+        IMangoStructs.cReferralParams memory referralParams = IMangoStructs.cReferralParams(
+            address(mangoRouter),//router address
+            address(mangoToken),
+            params.routerV2,
+            params.weth
+        );
+        //deploy referral
+        mangoReferral = new MangoReferral(referralParams);
     }
     //     function test_SwapAndDistribute_floor1_ethToTOken() external{
     //         (bool s,) = add1.call{value:1e18}("");

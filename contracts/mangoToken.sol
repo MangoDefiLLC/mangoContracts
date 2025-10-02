@@ -25,10 +25,12 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
     event PairAdded(address pair);
     event NewOwner(address newOwner);
 
-    constructor(uint256 totalSupply) Ownable(msg.sender) ERC20("MANGO DEFI", "MANGO") {
+    constructor(uint256 totalSupply) Ownable() ERC20("MANGO DEFI", "MANGO") {
      
         _mint(msg.sender, totalSupply);
     
+        //LOOK IN TO THIS CONSTRUCTOS
+        //AND CHECK FOR BEING ABLE TO GET PRICES FROM V3 POOL ONES DEPLOYED
         taxWallet = msg.sender;
         uniswapRouterV2 = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;//uniswap v2 router
         isExcludedFromTax[msg.sender] = true;
@@ -48,7 +50,7 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
         return true;
     }
 
-    function _transfer(address from, address to, uint256 amount) internal override {
+    function _transfer(address from, address to, uint256 amount) internal virtual override {
         uint256 taxAmount = 0;
 
         if (!isExcludedFromTax[from] && !isExcludedFromTax[to]) {

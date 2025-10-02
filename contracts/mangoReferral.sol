@@ -1,9 +1,9 @@
-
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.20;
 
-import {IERC20} from './interfaces/IERC20.sol';
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IRouterV2} from './interfaces/IRouterV2.sol';
+import {IMangoStructs} from "./interfaces/IMangoStructs.sol";
 //@DEV
 //THIS CONTRACT IS DESIGNE SO DISTRIBUTE THE FEE TO THE REFERRERS
 //DISTRIBUTES THE AMOUNTS IN $MANGO
@@ -40,14 +40,16 @@ contract MangoReferral {
         uint256 level;
         uint256 amount;
     }
+    //pool price from uniswap v2 or v3
+    //WARNING MANGO REFERRAL DOESNT GET PRICE FROM POOL
 
-     constructor(){//owner is dev wallet 
+     constructor(IMangoStructs.cReferralParams memory params){//owner is dev wallet 
          owner = msg.sender; //0x49f2f071B1Ac90eD1DB1426EA01cA4C145c45d48;//
-         mangoRouters[0x23F498aB49aA5E24c23d51e225F710E138D0c1D0] = true;//0x9E1672614377bBfdafADD61fB3Aa1897586D0903
-         mangoToken = IERC20(0xe3A7bd1f7F0bdEEce9DBb1230E64FFf26cd2C8b6);//0xdAbF530587e25f8cB30813CABA0C3CB1DA4f83D4
-         mangoPrice = 11_390_000_000 wei;
-         routerV2 = IRouterV2(0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24);//0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24
-         weth =  0x4200000000000000000000000000000000000006;//0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
+         mangoRouters[params.mangoRouter] = true;//0x9E1672614377bBfdafADD61fB3Aa1897586D0903
+         mangoToken = IERC20(params.mangoToken);//0xdAbF530587e25f8cB30813CABA0C3CB1DA4f83D4
+         routerV2 = IRouterV2(params.routerV2);//0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24
+         mangoPrice = 1e18;
+         weth =  params.weth;//0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
      }
     function getReferralChain(address swapper) external view returns (address){
         return referralChain[swapper];//returns address(0) when has no referrer
