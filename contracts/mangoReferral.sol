@@ -149,17 +149,14 @@ contract MangoReferral {
             // Move to the next referrer
             currentUser = currentReferrer;
         }
-
         // Check if we have enough balance to distribute all rewards
         require(
             contractBalance >= totalRewardsToDistribute,
             "Insufficient mango token balance for all rewards"
         );
-
         // Distribute rewards
         for (uint8 i = 0; i < chainLength; i++) {
             ReferralReward memory reward = rewards[i];
-
             // Transfer tokens to the referrer
             require(
                 mangoToken.transfer(reward.referrerAddress, reward.amount),

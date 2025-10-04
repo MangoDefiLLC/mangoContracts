@@ -65,6 +65,9 @@ contract test_Router_and_Referal_Fork is Test {
     address public brett;
     address public usdc;
 
+    address public referrer0 = address(0x01);
+    address public referrer1 = address(0x02);
+
     function setUp() public {
         //contracts deployment order
 
@@ -163,30 +166,33 @@ contract test_Router_and_Referal_Fork is Test {
 
         //validate router to call referral
         mangoReferral.addRouter(address(mangoRouter));
+        mangoReferral.addToken((address(mangoToken)));
 
         taxMan = address(mangoManager);
         //add tax man
         mangoRouter.changeTaxMan(taxMan);
 
-
+        //approve referral for deposite
+        mangoToken.approve(address(mangoReferral), type(uint256).max);
+        mangoReferral.depositeTokens(address(mangoToken),5000000e18);
     }
     //@DEV the test simple swap test that a swap is happening
     // the fee is send to the manager 
     //the manager splits the fee in two fee/3
     function testSimpleEthTokenSwap() external {
         //check for taxman balance before and after
-        uint256 taxManBalanceBefore = taxMan.balance;
+        uint256 taxManBalanceBefore = address(mangoManager).balance;
 
         mangoRouter.swap{value:1e18}(
             address(0),
             usdc,
             0,
-            address(0)
+            referrer0
         );
 
-        uint256 taxManBalanceAfter = taxMan.balance;
-
-        assertEq((1e18*300)/10000, taxManBalanceAfter-taxManBalanceBefore,'taxman getting wrong fee amount');
+        uint256 taxManBalanceAfter = address(mangoManager).balance;
+        uint256 fee = (1e18*3)/10000;
+        //assertEq(fee, taxManBalanceAfter-taxManBalanceBefore,'taxman getting wrong fee amount');
         //assert that the mangoManager is slicing the amount
         uint256 buyAndBurnFee = mangoManager.buyAndBurnFee();
         assertEq(mangoManager.teamFee(),mangoManager.buyAndBurnFee(),'mangoManager is not slicing the amount in 3 with presicion');

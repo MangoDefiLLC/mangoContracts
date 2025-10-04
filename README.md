@@ -18,6 +18,10 @@ mango defi contracts are the bread and butter of mango echosystem.
     -router will send the fee amount , hasno other power in the contract or it should
     -Token need to interact with token contract to call burning function
     -Referral the manager should be able to MANGO and fund the referral contract
+    **note WARNING** manager should not hold mango tokens
+    as function like burn get the amount to burn by calling 
+    token.balanceOf(address(manager))
+    this takes al mangos tokens in the contract and burns them
 
 ## Roles
 

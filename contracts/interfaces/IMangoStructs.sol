@@ -18,4 +18,10 @@ interface IMangoStructs{
         address weth;
     }
 
+    struct cManagerParams{
+        address mangoRouter;
+        address mangoReferral;
+        address token;
+    }
+
 }

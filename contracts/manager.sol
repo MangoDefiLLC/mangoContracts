@@ -8,18 +8,17 @@ import { IMangoErrors } from '../contracts/interfaces/IMangoErrors.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-/**THIS MODULE IS MENT TO MANAGE FEES FROM MANGO ROUTER AND TOKENS TAX
-FUNCTIONS:
-* BUY AND BURN - BUY X AMOUNT OF THE HOLDING AND BURN
-* SEND X AMOUNT OF HOLDING TO OWNER
-* buy and fund the referral
-@STATE VARS:
-- teamFee - amount of fee colelcted for corp
-- buyAndBurnFee -  amount of eth avaliable to buy and burn
-- referralFee - amount of eth to buy and fund the referral
- */
+//THIS MODULE IS MENT TO MANAGE FEES FROM MANGO ROUTER AND TOKENS TAX
+//FUNCTIONS:
+//BUY AND BURN //BUY X AMOUNT OF THE HOLDING AND BURN
+//SEND X AMOUNT OF HOLDING TO OWNER
+//buy and fund the referral
+//@STATE VARS:
+//teamFee //amount of fee colelcted for corp
+//buyAndBurnFee // amount of eth avaliable to buy and burn
+//referralFee //amount of eth to buy and fund the referral
+ 
 contract Mango_Manager is Ownable {
-    using SafeMath for uint256;
 
     IMangoRouter public mangoRouter;
     MANGO_DEFI_TOKEN public mangoToken;
@@ -29,7 +28,7 @@ contract Mango_Manager is Ownable {
     uint256 public teamFee;
     uint256 public buyAndBurnFee;
     uint256 public referralFee;
-    uint256 public totalFeesCollected;
+    uint256 public totalFeesCollected;//slot 7
     uint256 public totalBurned;
     uint256 public constant BASIS_POINTS = 10000;
 
@@ -41,27 +40,43 @@ contract Mango_Manager is Ownable {
         Ownable(){
         mangoRouter = IMangoRouter(params.mangoRouter);
         mangoReferral = IMangoReferral(params.mangoReferral);
-        mangoToken = IERC20(params.token);
+        mangoToken = MANGO_DEFI_TOKEN(params.token);
     }
 
     function burn(uint256 amount) external onlyOwner{
         //should i make this external?
         //or only owner
-        if(msg.sender != owner()) revert IMangoStructs.NotOwner();
+        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         if(amount > buyAndBurnFee) revert IMangoErrors.AmountExceedsFee();
 
         _buyMango(amount);
+        //assume this contract has 0 mango
+        uint256 amountToBurn = mangoToken.balanceOf(address(this));
         //call the burn function in the erc20 token contract
-        mangoToken.burn(amount);
+        mangoToken.burn(amountToBurn);
 
         buyAndBurnFee -= amount;
         totalBurned += amount;
     }
     function fundReferral(uint256 amount)external{
-        if(msg.sender != owner()) revert IMangoStructs.NotOwner();
+        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         if(amount > referralFee) revert IMangoErrors.AmountExceedsFee();
 
         _buyMango(amount);
+        //@NOTE:
+        // if the referral has more tokens than the amount we just purchase
+        // risk of sending all to referral
+        //@dev: for ow this contract deals only with eth
+        uint256 amountOut = mangoToken.balanceOf(address(this));
+    
+        (bool s,) = address(mangoReferral).call(
+            abi.encodeWithSignature(
+                "function depositeTokens(address token, uint256 amount)",
+            address(mangoToken),
+            amountOut
+            )
+        );
+        if(!s) revert IMangoErrors.ReferralFundingFailed();
         referralFee -= amount;
         //send Mango tokens to referral
         //call deposite on referral
@@ -89,12 +104,7 @@ contract Mango_Manager is Ownable {
         _setFees(msg.value);
         emit FeesReceived(msg.value);
     }
-    function withdrawTeamFee() external{
-        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
-        (bool s,) = msg.sender.call{value:teamFee}("");
-        if(!s) revert IMangoErrors.WithdrawalFailed();
-    }
-    function withdrawEth(uint256 amount) external{
+    function withdrawTeamFee(uint256 amount) external{
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         (bool s,) = msg.sender.call{value:amount}("");
         if(!s) revert IMangoErrors.WithdrawalFailed();
