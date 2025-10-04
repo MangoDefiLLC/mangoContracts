@@ -6,7 +6,6 @@ import {Test, console} from "forge-std/Test.sol";
 import {IMangoRouter} from '../contracts/interfaces/IMangoRouter.sol';
 import {MangoRouter002} from "../contracts/mangoRouter001.sol";
 import {MANGO_DEFI_TOKEN} from "../contracts/mangoToken.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {MangoReferral} from '../contracts/mangoReferral.sol';
 import { IUniswapV2Factory } from "../contracts/interfaces/IUniswapV2Factory.sol";
 import { IUniswapV3Factory } from "../contracts/interfaces/IUniswapV3Factory.sol";
@@ -15,6 +14,8 @@ import { IMangoReferral } from "../contracts/interfaces/IMangoReferral.sol";
 import { IWETH9 } from "../contracts/interfaces/IWETH9.sol";
 import { IMangoErrors } from "../contracts/interfaces/IMangoErrors.sol";
 import {IMangoStructs} from "../contracts/interfaces/IMangoStructs.sol";
+import {Mango_Manager} from "../contracts/manager.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 //import { ISwapRouter02} from "../contracts/interfaces/ISwapRouter02.sol";
 //import {IAllowanceTransfer} from '../permit2/src/interfaces/IAllowanceTransfer.sol';
 interface CheatCodes {
@@ -44,6 +45,8 @@ contract test_Router_and_Referal_Fork is Test {
     MangoRouter002 public mangoRouter;
     MANGO_DEFI_TOKEN public mangoToken;
     MangoReferral public  mangoReferral;
+    Mango_Manager public mangoManager;
+    
 
     string public BASE;
     string public SEPOLIA;
@@ -53,7 +56,7 @@ contract test_Router_and_Referal_Fork is Test {
     uint256 public baseFork;
     uint256 public sepoliaFork;
 
-    address public taxMan = address(0x01);
+    address public taxMan;
 
     //IAllowanceTransfer public permit2;
 
@@ -128,6 +131,7 @@ contract test_Router_and_Referal_Fork is Test {
             300,//taxFee
             100//fererralFee */
 
+
         mangoRouter = new MangoRouter002(params);
         console.log('Router Address:',address(mangoRouter));
 
@@ -144,15 +148,32 @@ contract test_Router_and_Referal_Fork is Test {
         //deploy referral
         mangoReferral = new MangoReferral(referralParams);
 
-        //set referral contract on mango router
+        //prapre params for mangoManager
+        IMangoStructs.cManagerParams memory mangoManagerParams = IMangoStructs.cManagerParams(
+            address(mangoRouter),
+            address(mangoReferral),
+            address(mangoToken)
+        );
+        mangoManager = new Mango_Manager(mangoManagerParams);
+
+        //@DEV Now we set all the current contracts
+
+        //set referral contract on router
         mangoRouter.setReferralContract(address(mangoReferral));
 
         //validate router to call referral
         mangoReferral.addRouter(address(mangoRouter));
+
+        taxMan = address(mangoManager);
         //add tax man
         mangoRouter.changeTaxMan(taxMan);
+
+
     }
-    function test_simpleEthTokenSwap() external {
+    //@DEV the test simple swap test that a swap is happening
+    // the fee is send to the manager 
+    //the manager splits the fee in two fee/3
+    function testSimpleEthTokenSwap() external {
         //check for taxman balance before and after
         uint256 taxManBalanceBefore = taxMan.balance;
 
@@ -164,7 +185,12 @@ contract test_Router_and_Referal_Fork is Test {
         );
 
         uint256 taxManBalanceAfter = taxMan.balance;
+
         assertEq((1e18*300)/10000, taxManBalanceAfter-taxManBalanceBefore,'taxman getting wrong fee amount');
+        //assert that the mangoManager is slicing the amount
+        uint256 buyAndBurnFee = mangoManager.buyAndBurnFee();
+        assertEq(mangoManager.teamFee(),mangoManager.buyAndBurnFee(),'mangoManager is not slicing the amount in 3 with presicion');
+        assertEq(mangoManager.buyAndBurnFee(),mangoManager.referralFee(), 'mangoManager is not slicing the amount in 3 with presicion');
     }
     //     function test_SwapAndDistribute_floor1_ethToTOken() external{
     //         (bool s,) = add1.call{value:1e18}("");
@@ -287,5 +313,5 @@ contract test_Router_and_Referal_Fork is Test {
     //     assertNotEq(mangoBalanceBefore,IERC20(mango).balanceOf(address(this)));
         
     // }
-    fallback() external payable {}
+    //fallback() external payable {}
 }
