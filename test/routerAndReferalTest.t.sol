@@ -59,13 +59,11 @@ contract test_Router_and_Referal_Fork is Test {
     address public taxMan;
 
     //IAllowanceTransfer public permit2;
-
-
     address public weth;
     address public brett;
     address public usdc;
 
-    address public referrer0 = address(0x01);
+    address public referrer0 = 0x6Ac62127988e20768DE5c95B3D9444B76FeEF889;
     address public referrer1 = address(0x02);
 
     function setUp() public {
@@ -94,7 +92,6 @@ contract test_Router_and_Referal_Fork is Test {
         //vm.makePersistent(mangoRouter,mangoToken,mangoReferral);
         //deply referal to test it works
         //mangoReferal = new MangoReferral(address(this),address(mangoRouter));//owner and router
-    
         }
         // create two _different_ forks during setup
  
@@ -138,8 +135,15 @@ contract test_Router_and_Referal_Fork is Test {
         mangoRouter = new MangoRouter002(params);
         console.log('Router Address:',address(mangoRouter));
 
+        //prepare token params
+        IMangoStructs.cTokenParams memory tokenParams = IMangoStructs.cTokenParams(
+            address(0),
+            address(0),
+            address(0),
+            address(0)
+        );
         //deploy token
-        mangoToken = new MANGO_DEFI_TOKEN(100000000000e18);
+        mangoToken = new MANGO_DEFI_TOKEN(tokenParams);
         
         //setting up params for referral
         IMangoStructs.cReferralParams memory referralParams = IMangoStructs.cReferralParams(
@@ -181,23 +185,22 @@ contract test_Router_and_Referal_Fork is Test {
     //the manager splits the fee in two fee/3
     function testSimpleEthTokenSwap() external {
         //check for taxman balance before and after
-        uint256 taxManBalanceBefore = address(mangoManager).balance;
-
+        console.log('this is referra add',address(mangoReferral));
         mangoRouter.swap{value:1e18}(
             address(0),
             usdc,
             0,
             referrer0
         );
-
-        uint256 taxManBalanceAfter = address(mangoManager).balance;
-        uint256 fee = (1e18*3)/10000;
         //assertEq(fee, taxManBalanceAfter-taxManBalanceBefore,'taxman getting wrong fee amount');
         //assert that the mangoManager is slicing the amount
-        uint256 buyAndBurnFee = mangoManager.buyAndBurnFee();
+
         assertEq(mangoManager.teamFee(),mangoManager.buyAndBurnFee(),'mangoManager is not slicing the amount in 3 with presicion');
         assertEq(mangoManager.buyAndBurnFee(),mangoManager.referralFee(), 'mangoManager is not slicing the amount in 3 with presicion');
+
+        //to test buy and burn pool hase to be created
     }
+
     //     function test_SwapAndDistribute_floor1_ethToTOken() external{
     //         (bool s,) = add1.call{value:1e18}("");
     //         uint256 ethBalanceBeforeSwap = address(this).balance;

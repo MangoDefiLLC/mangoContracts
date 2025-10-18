@@ -43,7 +43,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     IWETH9 public immutable weth;
     address public taxMan; //receiver of the tax
     uint256 public  referralFee;
-    uint256 public constant basisPoints =  10000;
+    uint256 public immutable BASIS_POINTS =  10000;
 
     struct Path {
         address token0;
@@ -94,11 +94,11 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         if(s != true) revert IMangoErrors.TransferFailed();
     }
     function _tax(uint256 _amount) private view returns(uint256 amount){
-        uint256 taxAmount = (_amount * taxFee)/basisPoints;
+        uint256 taxAmount = (_amount * taxFee)/BASIS_POINTS;
         amount = _amount - taxAmount;//amount is the amount to user de rest is the fee
     }
      function _referalFee(uint256 amount) private view returns (uint256 referalPay){//this amount is the 3% for taxMan
-        referalPay = (amount*referralFee)/basisPoints; 
+        referalPay = (amount*referralFee)/BASIS_POINTS; 
     }
     function _payTaxMan(uint256 amount) private {
         _transferEth(taxMan,amount);
@@ -191,7 +191,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         address referrer
     ) internal returns (bool) {
         (bool s, ) = address(mangoReferral).call( 
-            abi.encodeWithSignature("distributeReferralRewardsRewards(address,uint256,address)",
+            abi.encodeWithSignature("distributeReferralRewards(address,uint256,address)",
             user,
             amount,
             referrer));

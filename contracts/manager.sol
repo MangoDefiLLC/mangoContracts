@@ -43,7 +43,7 @@ contract Mango_Manager is Ownable {
         mangoToken = MANGO_DEFI_TOKEN(params.token);
     }
 
-    function burn(uint256 amount) external onlyOwner{
+    function burn(uint256 amount) external {
         //should i make this external?
         //or only owner
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
@@ -84,10 +84,11 @@ contract Mango_Manager is Ownable {
   
     function _buyMango(uint256 amount) private returns(uint256){
         //making a low level call to foward al gass fees
-        (bool s,) = address(mangoRouter).call{value:amount}(
+        (bool s,bytes memory amountOut) = address(mangoRouter).call{value:amount}(
             abi.encodeWithSignature("swap(address,address,uint256,address)",address(0),address(mangoToken),0,address(0))
         );
         if(!s) revert IMangoErrors.SwapFailed();
+        return abi.decode(amountOut,(uint256));
     }
 
     //of the amount comming in is the 3% fee wish is divided by 3 (1% each)

@@ -4,7 +4,3 @@ TOKEN:
  test:
 - make sure price is pooling correcly from v3 or v2 poolin
 - test taxes
-
-MANAGER:
-()on fee collected  make sure all all 3 varibles = the amount in
-make sure precicios is working

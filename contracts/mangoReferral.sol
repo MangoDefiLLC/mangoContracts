@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IRouterV2} from './interfaces/IRouterV2.sol';
 import {IMangoStructs} from "./interfaces/IMangoStructs.sol";
+import {IMangoErrors} from "./interfaces/IMangoErrors.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 //@DEV
 //THIS CONTRACT IS DESIGNE SO DISTRIBUTE THE FEE TO THE REFERRERS
 //DISTRIBUTES THE AMOUNTS IN $MANGO
@@ -11,15 +13,13 @@ import {IMangoStructs} from "./interfaces/IMangoStructs.sol";
 //@ADD:  RQUIRE MSG.SENDER IS MANGO ROUTER
 //NOTE THE AMOUNT THAT IS SENT TO THIS CONTRACT IS ALREADY THE 1% 
 //OF THE %3 OF THE SWAP
-contract MangoReferral {
+contract MangoReferral is Ownable{
 
-     address public owner;
-     IERC20 public mangoToken;
-     bool public presaleEnded;
      address public weth;
+     IERC20 public mangoToken;
      IRouterV2 public immutable routerV2;
 
-     mapping(address=>bool) public  mangoRouters;//to ensure call is comming from routers
+     mapping(address=>bool) public  whiteListed;//to ensure call is comming from routers
      mapping(address=>uint256) public lifeTimeEarnings;
      mapping(address=>address) public referralChain;// address => referrerAddress
      // Reward percentages for each level (in basis points, 1/100 of a percent)
@@ -29,11 +29,9 @@ contract MangoReferral {
     // Level 4: 10% (1000 basis points). 
     // Level 5: 10% (1000 basis points)
     uint256[5] public rewardPercentages = [4000, 2500, 1500, 1000, 1000];
-    uint256 public mangoPrice;
-
+   
     event DistributedAmount(uint256);
     event ReferralAdded(address evangelist,address beliver);
-    event SetPrice(uint256);
 
     struct ReferralReward {
         address referrerAddress;
@@ -43,35 +41,27 @@ contract MangoReferral {
     //pool price from uniswap v2 or v3
     //WARNING MANGO REFERRAL DOESNT GET PRICE FROM POOL
 
-     constructor(IMangoStructs.cReferralParams memory params){//owner is dev wallet 
-         owner = msg.sender; //0x49f2f071B1Ac90eD1DB1426EA01cA4C145c45d48;//
-         mangoRouters[params.mangoRouter] = true;//0x9E1672614377bBfdafADD61fB3Aa1897586D0903
+     constructor(IMangoStructs.cReferralParams memory params) Ownable(){//owner is dev wallet 
+         //0x49f2f071B1Ac90eD1DB1426EA01cA4C145c45d48;//
+         whiteListed[params.mangoRouter] = true;//0x9E1672614377bBfdafADD61fB3Aa1897586D0903
          mangoToken = IERC20(params.mangoToken);//0xdAbF530587e25f8cB30813CABA0C3CB1DA4f83D4
          routerV2 = IRouterV2(params.routerV2);//0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24
-         mangoPrice = 1e18;
          weth =  params.weth;//0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
      }
     function getReferralChain(address swapper) external view returns (address){
         return referralChain[swapper];//returns address(0) when has no referrer
     }
-    //THIS PRICE IN DETERMINED IN ETH OR WETH
-    // SO THIS CONTRACT WILL RECIVES ETH OR WETH
-    //TO GET MORE TOKENS IMPLEMENT SWAPPING TOKENS TO WETH
-    //THEN PAYINGOUT 
+    //CHANGE TO GET PRICE FOM V3 OR V2
     function _getMangoAmountETH(
         uint256 amount
     ) private  returns (uint256 mangoTokensAmount) {
-        if(presaleEnded == true){
+        
             //LOGIC TO GET PRICE FROM UNISWAPV2 POOL
-            //if presale ended
               address[] memory path = new address[](2);
                 path[0] = weth;
                 path[1] = address(mangoToken);
                 uint256[] memory amountOut = routerV2.getAmountsOut(amount,path);
                 mangoTokensAmount = amountOut[1];
-        }else{
-            mangoTokensAmount = (amount * 10**18) / mangoPrice; // Fixed
-        }
     }
     ///CREATE FUNCTION TO
     function distributeReferralRewards(
@@ -79,7 +69,7 @@ contract MangoReferral {
         uint256 inputAmount,//amount to distribute IF THIS AMOUNT IS NOT 0, SWAP TOKEN TO ETH
         address referrer// the referrer
     ) external payable {
-        require(mangoRouters[msg.sender],'only mango routers can call Distribution');
+        require(whiteListed[msg.sender],'only mango routers can call Distribution');
         uint256 mangoTokensAmount = _getMangoAmountETH(inputAmount);
 
         _buildReferralChainAndTransferRewards(
@@ -166,32 +156,28 @@ contract MangoReferral {
         }
         return rewards;
     }
-    function setTokenPrice(uint256 price) external {
-        require(msg.sender == owner);
-        mangoPrice = price;
-        emit SetPrice(price);
-    }
     function withDrawTokens(address token,uint256 amount) external{
-        require(msg.sender == owner,'not owner');
-        require(IERC20(token).transfer(owner,amount),'transfer failed!');
+        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
+        require(IERC20(token).transfer(owner(),amount),'transfer failed!');
     }
     function ethWithdraw(uint256 amount) external{
-        require(msg.sender == owner);
-        (bool s,) = owner.call{value:amount}("");
+        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
+        (bool s,) = owner().call{value:amount}("");
         require(s);
     }
     function addToken(address token) external {
-        require(msg.sender == owner);
+        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         mangoToken = IERC20(token);
     }
     function addRouter(address router) external {
-        require(msg.sender == owner);
-        mangoRouters[router] = true;
+        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
+        whiteListed[router] = true;
 
     }
     function depositeTokens(address token, uint256 amount) public {
-        require(msg.sender == owner || msg.sender == address(this),'not allowed to DP');
+        require(msg.sender == owner(),'not allowed to DP');
         IERC20(token).transferFrom(msg.sender, address(this), amount);
     }
-    fallback() external {}
+    receive()external payable{
+    }
 }
