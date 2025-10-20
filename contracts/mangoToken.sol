@@ -14,16 +14,16 @@ interface IUniswapV2Router02 {
 }
     
 contract mockMANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
+    uint256 public constant BUY_TAX = 200;  // 2%
+    uint256 public constant SELL_TAX = 300; // 3%
+    uint256 public constant BASIS_POINT = 10000;
 
-    uint256 public  immutable BUY_TAX = 200;  // 2% in basis points (BPS)
-    uint256 public immutable SELL_TAX = 300; // 3% in basis points (BPS)
-    uint256 public immutable BASIS_POINT = 1000;
     address public uniswapRouterV2;
     address public uniswapRouterV3;
     address public uniswapV3Factory;
-
     address public taxWallet;
-    uint256[] public v3FeeTiers = [100,BUY_TAX,BASIS_POINT,SELL_TAX,30000];
+
+    uint24[] public v3FeeTiers = [100, 500, 3000, 10000];
 
     mapping(address => bool) public isExcludedFromTax;
     mapping(address => bool) public isPair;
@@ -32,44 +32,39 @@ contract mockMANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
     event TaxWalletUpdated(address newTaxWallet);
     event PairAdded(address pair);
     event NewOwner(address newOwner);
-    event V3PoolAdded(address);
+    event V3PoolAdded(address pool);
 
-    constructor(IMangoStructs.cTokenParams memory cParams) Ownable() ERC20("mockMANGO DEFI", "MANGO") {
-                //IMangoStructs.cTokenParams memory cParams
-        _mint(msg.sender,  100000000000e18);
-        //LOOK IN TO THIS CONSTRUCTOS
+    constructor(IMangoStructs.cTokenParams memory cParams) ERC20("mockMANGO DEFI", "MANGO") {
+        _mint(msg.sender, 100_000_000_000e18);
         taxWallet = msg.sender;
+
         uniswapRouterV2 = cParams.uniswapRouterV2;
-        uniswapRouterV3 =  cParams.uniswapRouterV3;
-        uniswapV3Factory =  cParams.uniswapV3Factory;
-        uniswapRouterV2 =   cParams.uniswapRouterV2;//uniswap v2 router
+        uniswapRouterV3 = cParams.uniswapRouterV3;
+        uniswapV3Factory = cParams.uniswapV3Factory;
+
         isExcludedFromTax[msg.sender] = true;
         isExcludedFromTax[address(this)] = true;
         isExcludedFromTax[uniswapRouterV2] = true;
+        isExcludedFromTax[uniswapRouterV3] = true;
     }
-    //**THE TAXES FOR THIS IS DESIGNE FOR V2, V3 NEEDS TO BE ADDED AND TESTED */
-    //** V2 PAIR MANAGEMENT **//
+
+    // V2 pair
     function addPair(address pair) external onlyOwner {
         require(pair != address(0), "Invalid pair address");
         isPair[pair] = true;
         emit PairAdded(pair);
     }
-    //** V3 POOL MANAGEMENT **//
+
+    // V3 pool
     function addV3Pool(address pool) external onlyOwner {
         require(pool != address(0), "Invalid pool address");
         isV3Pool[pool] = true;
         emit V3PoolAdded(pool);
     }
 
-    // Auto-detect and add V3 pools for common fee tiers
-    //fee tiers get from router
-    function autoDetectV3Pools(address token0,address token1) external onlyOwner returns(address pool){
+    function autoDetectV3Pools(address token0, address token1) external onlyOwner {
         for (uint i = 0; i < v3FeeTiers.length; i++) {
-            pool = IUniswapV3Factory(uniswapV3Factory).getPool(
-                token0,
-                token1,
-                uint24(v3FeeTiers[i])
-            );
+            address pool = IUniswapV3Factory(uniswapV3Factory).getPool(token0, token1, v3FeeTiers[i]);
             if (pool != address(0) && !isV3Pool[pool]) {
                 isV3Pool[pool] = true;
                 emit V3PoolAdded(pool);
@@ -77,12 +72,11 @@ contract mockMANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
         }
     }
 
-    function excludeAddress(address _addr) external onlyOwner returns (bool) {
-        isExcludedFromTax[_addr] = true;
-        return true;
+    function excludeAddress(address addr) external onlyOwner {
+        isExcludedFromTax[addr] = true;
     }
 
-    function _transfer(address from, address to, uint256 amount) internal virtual override {
+    function _transfer(address from, address to, uint256 amount) internal override {
         uint256 taxAmount = 0;
 
         if (!isExcludedFromTax[from] && !isExcludedFromTax[to]) {
@@ -90,10 +84,8 @@ contract mockMANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
             bool isBuy = isPair[from] || isV3Pool[from];
 
             if (isSell) {
-                // Sell transaction
                 taxAmount = (amount * SELL_TAX) / BASIS_POINT;
             } else if (isBuy) {
-                // Buy transaction
                 taxAmount = (amount * BUY_TAX) / BASIS_POINT;
             }
         }
@@ -106,20 +98,15 @@ contract mockMANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
         }
     }
 
-    //** V3 POOL CHECKER **//
-    function isV3PoolAddress(address pool) public view returns (bool) {
-        return isV3Pool[pool];
-    }
-
     function setTaxWallet(address _taxWallet) external {
-        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
+        if (msg.sender != owner()) revert IMangoErrors.NotOwner();
         require(_taxWallet != address(0), "Zero address not allowed");
         taxWallet = _taxWallet;
         emit TaxWalletUpdated(_taxWallet);
     }
 
     function changeOwner(address _newOwner) external {
-        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
+        if (msg.sender != owner()) revert IMangoErrors.NotOwner();
         require(_newOwner != address(0), "Zero address not allowed");
         transferOwnership(_newOwner);
         emit NewOwner(_newOwner);
