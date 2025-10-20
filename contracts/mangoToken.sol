@@ -13,11 +13,11 @@ interface IUniswapV2Router02 {
     function factory() external pure returns (address);
 }
     
-contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
+contract mockMANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
 
-    uint256 public  constant BUY_TAX = 200;  // 2% in basis points (BPS)
-    uint256 public constant SELL_TAX = 300; // 3% in basis points (BPS)
-    uint256 public constant BASIS_POINT = 1000;
+    uint256 public  immutable BUY_TAX = 200;  // 2% in basis points (BPS)
+    uint256 public immutable SELL_TAX = 300; // 3% in basis points (BPS)
+    uint256 public immutable BASIS_POINT = 1000;
     address public uniswapRouterV2;
     address public uniswapRouterV3;
     address public uniswapV3Factory;
@@ -34,7 +34,7 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
     event NewOwner(address newOwner);
     event V3PoolAdded(address);
 
-    constructor(IMangoStructs.cTokenParams memory cParams) Ownable() ERC20("MANGO DEFI", "MANGO") {
+    constructor(IMangoStructs.cTokenParams memory cParams) Ownable() ERC20("mockMANGO DEFI", "MANGO") {
                 //IMangoStructs.cTokenParams memory cParams
         _mint(msg.sender,  100000000000e18);
         //LOOK IN TO THIS CONSTRUCTOS
@@ -63,11 +63,11 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
 
     // Auto-detect and add V3 pools for common fee tiers
     //fee tiers get from router
-    function autoDetectV3Pools(address otherToken) external onlyOwner returns(address pool){
+    function autoDetectV3Pools(address token0,address token1) external onlyOwner returns(address pool){
         for (uint i = 0; i < v3FeeTiers.length; i++) {
             pool = IUniswapV3Factory(uniswapV3Factory).getPool(
-                address(this),
-                otherToken,
+                token0,
+                token1,
                 uint24(v3FeeTiers[i])
             );
             if (pool != address(0) && !isV3Pool[pool]) {
