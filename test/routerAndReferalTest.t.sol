@@ -96,7 +96,7 @@ contract test_Router_and_Referal_Fork is Test {
 
         seller = 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17;
 
-        uint256 activeFork = selectFork(bscFork);
+        uint256 activeFork = selectFork(arbitrumFork);
         // set variables according to selected fork
         setVariablesByChain(activeFork);
 

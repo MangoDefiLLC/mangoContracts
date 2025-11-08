@@ -12,7 +12,6 @@ import { IMangoReferral } from "./interfaces/IMangoReferral.sol";
 import { IWETH9 } from "./interfaces/IWETH9.sol";
 import { IMangoErrors } from "./interfaces/IMangoErrors.sol";
 import {IMangoStructs} from "./interfaces/IMangoStructs.sol";
-
 interface ISwapRouter02 {
     struct ExactInputSingleParams {
         address tokenIn;
@@ -29,6 +28,7 @@ interface ISwapRouter02 {
         payable
         returns (uint256 amountOut);
 }
+
 
 contract MangoRouter002 is ReentrancyGuard, Ownable {
 
@@ -74,7 +74,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         factoryV2 = IUniswapV2Factory(cParams.factoryV2);
         factoryV3 = IUniswapV3Factory(cParams.factoryV3);
         routerV2 =  IRouterV2(cParams.routerV2);
-        swapRouter02 = ISwapRouter02(cParams.swapRouter02);//bsc
+        swapRouter02 = ISwapRouter02(cParams.swapRouter02);//
         //ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
         weth = IWETH9(cParams.weth);
         taxFee = cParams.taxFee;//%3 in basis points
@@ -283,12 +283,12 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
             require(IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount), 'tranfer failed');
         }      
         //check this function
-        ISwapRouter02.ExactInputSingleParams memory params = ISwapRouter02
-            .ExactInputSingleParams({
+        ISwapRouter02.ExactInputSingleParams memory params = ISwapRouter02.ExactInputSingleParams({
                 tokenIn: data.token0, //token to swap
                 tokenOut: data.token1, //token in return
                 fee: data.poolFee,//poolFee
                 recipient: data.receiver, //reciever of the output token
+                //deadline: block.timestamp + 2,
                 amountIn: data.amount,// amont of input token you want to swap
                 amountOutMinimum: 0, //set to zero in this case
                 sqrtPriceLimitX96: 0 //set to zero
@@ -297,11 +297,11 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
             if(msg.value > 0){
                 emit Address(address(swapRouter02));
                 //change it to low level
-                (bool s,) = address(swapRouter02).call(abi.encodeWithSignature('exactInputSingle',params));
-                if(!s) revert IMangoErrors.SwapFailed();
-                //result = swapRouter02.exactInputSingle{value:data.amount}(params);
+                // (bool s,) = address(swapRouter02).call(abi.encodeWithSignature('exactInputSingle',params));
+                // if(!s) revert IMangoErrors.SwapFailed();
+                result = swapRouter02.exactInputSingle{value:data.amount}(params);
             }else{
-                result = swapRouter02.exactInputSingle(params);
+                //result = swapRouter02.exactInputSingle(params);
             }
     }
      //sell usdc for Weth in v3 pool
