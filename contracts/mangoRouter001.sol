@@ -18,6 +18,7 @@ interface ISwapRouter02 {
         address tokenOut;
         uint24 fee;
         address recipient;
+        uint256 deadline;
         uint256 amountIn;
         uint256 amountOutMinimum;
         uint160 sqrtPriceLimitX96;
@@ -288,7 +289,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                 tokenOut: data.token1, //token in return
                 fee: data.poolFee,//poolFee
                 recipient: data.receiver, //reciever of the output token
-                //deadline: block.timestamp + 2,
+                deadline: block.timestamp + 2,
                 amountIn: data.amount,// amont of input token you want to swap
                 amountOutMinimum: 0, //set to zero in this case
                 sqrtPriceLimitX96: 0 //set to zero
@@ -301,7 +302,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                 // if(!s) revert IMangoErrors.SwapFailed();
                 result = swapRouter02.exactInputSingle{value:data.amount}(params);
             }else{
-                //result = swapRouter02.exactInputSingle(params);
+                result = swapRouter02.exactInputSingle(params);
             }
     }
      //sell usdc for Weth in v3 pool
