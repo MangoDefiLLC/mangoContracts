@@ -1,7 +1,10 @@
 [profile.default]
 src = "src"
 out = "out"
+via_ir = true
 remappings = [
+        "@uniswap/v3-periphery/=lib/v3-periphery/contracts",
+        "@uniswap/v3-core/=lib/v3-core/contracts",
         "@openzeppelin/=lib/openzeppelin-contracts",
         "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts"
     ]

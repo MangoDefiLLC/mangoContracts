@@ -5,6 +5,7 @@ import {MANGO_DEFI_TOKEN} from '../contracts/mangoToken.sol';
 import {IMangoReferral} from '../contracts/interfaces/IMangoReferral.sol';
 import {IMangoStructs} from '../contracts/interfaces/IMangoStructs.sol';
 import { IMangoErrors } from '../contracts/interfaces/IMangoErrors.sol';
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import '@openzeppelin/contracts/access/Ownable.sol';
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
@@ -18,7 +19,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 //buyAndBurnFee // amount of eth avaliable to buy and burn
 //referralFee //amount of eth to buy and fund the referral
  
-contract Mango_Manager is Ownable {
+contract Mango_Manager is Ownable, ReentrancyGuard {
 
     IMangoRouter public mangoRouter;
     MANGO_DEFI_TOKEN public mangoToken;

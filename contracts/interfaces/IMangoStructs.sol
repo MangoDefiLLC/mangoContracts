@@ -23,10 +23,10 @@ interface IMangoStructs{
         address mangoReferral;
         address token;
     }
-     struct cTokenParams{
+    struct cTokenParams{
         address manager;
         address uniswapRouterV2;//where im getting mango price
-        address  uniswapRouterV3;
+        address uniswapRouterV3;
         address uniswapV3Factory;
     }
 

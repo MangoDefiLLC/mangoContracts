@@ -97,5 +97,6 @@ contract Presale {
         PRICE = newPrice;
         emit PriceSet(PRICE);
     }
+
    // fallback() external payable {}
 }

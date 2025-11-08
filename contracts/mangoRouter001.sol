@@ -30,8 +30,6 @@ interface ISwapRouter02 {
         returns (uint256 amountOut);
 }
 
-//import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-//@DEV this is the first version of the MAngo router
 contract MangoRouter002 is ReentrancyGuard, Ownable {
 
     IUniswapV2Factory public immutable factoryV2;
@@ -54,11 +52,14 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         address referrer;
     }
 
-    event Swap(address swaper,
+    event Swap(
+        address swaper,
         address token0, 
         address token1,
-        uint amountOut);
+        uint amountOut
+        );
     event Amount(uint256,uint256);
+    event Address(address);
 
     event ReferralPayout(uint256 amountToReferral);
     event payTaxMan(uint256 amountToTaxMan);
@@ -81,7 +82,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
 
         //I WIll like to see how to make better the search of the pool
         //or jut route to a msart router
-        poolFees = [100,1000,10000,20000,2500,taxFee,3000,5000];
+        poolFees = [100,1000,BASIS_POINTS,20000,2500,taxFee,3000,5000];
         taxMan = msg.sender;//taxman is set to msg.sender until changed
         //ideally you want taxman to the the manager SMC
     }
@@ -212,9 +213,9 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         path.amount =  msg.value == 0 ? amount : _tax(msg.value);//only tax eth to token
         path.token0 = token0;
         path.token1 = token1;
-
-        path.referrer =  referrer == address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
-       
+        //@dev this line is for cheking if swapper has been referr
+       // path.referrer =  referrer == address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
+        path.referrer = referrer;//by default referrer is address 0 
             //find the v3 pool
              bool found;
              address pair;
@@ -294,7 +295,11 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
             });
             //call swap 
             if(msg.value > 0){
-                result = swapRouter02.exactInputSingle{value:data.amount}(params);
+                emit Address(address(swapRouter02));
+                //change it to low level
+                (bool s,) = address(swapRouter02).call(abi.encodeWithSignature('exactInputSingle',params));
+                if(!s) revert IMangoErrors.SwapFailed();
+                //result = swapRouter02.exactInputSingle{value:data.amount}(params);
             }else{
                 result = swapRouter02.exactInputSingle(params);
             }
@@ -356,5 +361,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         uint256 amount = IERC20(token).balanceOf(address(this));
         require(IERC20(token).transfer(msg.sender,amount));
+    }
+    fallback()external payable{
     }
 }

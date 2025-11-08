@@ -194,3 +194,14 @@ vips = [
 
 
 ,ock token base add = 0x3534c38E72636ef55E62ed82c7EA0D11B7aF7D23
+
+```
+command to deploy mangoContracts % forge script script/DeployScript.s.sol:Deploy_Script --rpc-url $SEPOLIA_RPC --private-key $PVK --broadcast --verify -vvvv
+```
+
+# Foundry cool commancs
+
+execute a tx that already happed and se the logs
+```
+cast run <TX_HASH> --rpc-url <YOUR_RPC_URL> [--verbosity <LEVEL>]
+```
