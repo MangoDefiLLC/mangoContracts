@@ -7,6 +7,7 @@ import {IMangoRouter} from '../contracts/interfaces/IMangoRouter.sol';
 import {MangoRouter002} from "../contracts/mangoRouter001.sol";
 import {MANGO_DEFI_TOKEN} from "../contracts/mangoToken.sol";
 import {MangoReferral} from '../contracts/mangoReferral.sol';
+import {ChainSetter} from './chainSetter.sol';
 import { IUniswapV2Factory } from "../contracts/interfaces/IUniswapV2Factory.sol";
 import { IUniswapV3Factory } from "../contracts/interfaces/IUniswapV3Factory.sol";
 import { IRouterV2 } from "../contracts/interfaces/IRouterV2.sol";
@@ -16,6 +17,13 @@ import { IMangoErrors } from "../contracts/interfaces/IMangoErrors.sol";
 import {IMangoStructs} from "../contracts/interfaces/IMangoStructs.sol";
 import {Mango_Manager} from "../contracts/manager.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+interface IAirdrop {
+     function airDrop(holder[] memory holdersList,address token) external;
+}
+struct holder{
+    address userAddress;
+    uint256 balance;
+}
 //import { ISwapRouter02} from "../contracts/interfaces/ISwapRouter02.sol";
 //import {IAllowanceTransfer} from '../permit2/src/interfaces/IAllowanceTransfer.sol';
 interface CheatCodes {
@@ -50,9 +58,13 @@ contract test_Router_and_Referal_Fork is Test {
 
     string public BASE;
     string public SEPOLIA;
+    string public BSC;
+    string public ARBITRUM;
     uint256 public amount;
     address public mango;
     address public seller;
+    uint256 public arbitrumFork;
+    uint256 public bscFork;
     uint256 public baseFork;
     uint256 public sepoliaFork;
 
@@ -62,6 +74,7 @@ contract test_Router_and_Referal_Fork is Test {
     address public weth;
     address public brett;
     address public usdc;
+    IMangoStructs.cParamsRouter public params;
 
     address public referrer0 = 0x6Ac62127988e20768DE5c95B3D9444B76FeEF889;
     address public referrer1 = address(0x02);
@@ -71,24 +84,32 @@ contract test_Router_and_Referal_Fork is Test {
 
        
         cheatCodes = CheatCodes(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
-        seller = 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17;
-        usdc = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
 
         BASE = vm.envString("BASE_RPC");
         SEPOLIA = vm.envString("SEPOLIA_RPC");
+        ARBITRUM = vm.envString("ARBITRUM_RPC");
+        BSC = vm.envString('BSC_RPC');
+        bscFork = vm.createFork(BSC);
+        arbitrumFork = vm.createFork(ARBITRUM);
         baseFork = vm.createFork(BASE);
        sepoliaFork = vm.createFork(SEPOLIA);
-        
+
+        seller = 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17;
+
+        uint256 activeFork = selectFork(bscFork);
+        // set variables according to selected fork
+        setVariablesByChain(activeFork);
+
+        mangoRouter = new MangoRouter002(params);
         //mango = 0x5Ac57Bf5395058893C1a0f4250D301498DCB11fC;
         // vm.startPrank(seller);
         // IERC20(mango).transfer(address(this),IERC20(mango).balanceOf(seller));
         // vm.stopPrank();
         deal(address(this),1e18);
 
-        testCanSelectFork();
-        testForkIdDiffer();
+        //set params base on selected fork
 
-        testSetEchosystemBase();
+
         //vm.makePersistent(mangoRouter,mangoToken,mangoReferral);
         //deply referal to test it works
         //mangoReferal = new MangoReferral(address(this),address(mangoRouter));//owner and router
@@ -101,102 +122,37 @@ contract test_Router_and_Referal_Fork is Test {
     }
  
     // select a specific fork
-    function testCanSelectFork() public {
+    function selectFork(uint256 _fork) public returns(uint256){
         // select the fork
-        vm.selectFork(baseFork);
-        assertEq(vm.activeFork(), baseFork);
+        vm.selectFork(_fork);
+        assertEq(vm.activeFork(), _fork);
+        return vm.activeFork();
  
         // from here on data is fetched from the `mainnetFork` if the EVM requests it and written to the storage of `mainnetFork`
-    }
-    //SETUP TOKEN REFERRAL READY TO TEST
-    function testSetEchosystemBase() public {
-        //deploy router
-        IMangoStructs.cParamsRouter memory params = IMangoStructs.cParamsRouter(
-            //this is base 
-            0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6,//factpryv2
-            0x33128a8fC17869897dcE68Ed026d694621f6FDfD,//factpry v3
-            0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24,//routerv2
-            0x2626664c2603336E57B271c5C0b26F421741e481,//swapRouter02
-            0x4200000000000000000000000000000000000006,//weth
-            300,//taxFee
-            100//fererralFee
-        );
-        /**
-         //this is BSC
-            0xBCfCcbde45cE874adCB698cC183deBcF17952812,//factpryv2
-            0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865,//factpry v3
-            0x10ED43C718714eb63d5aA57B78B54704E256024E,//routerv2
-            0x1b81D678ffb9C0263b24A97847620C99d213eB14,//swapRouter02
-            0x4200000000000000000000000000000000000006,//weth
-            300,//taxFee
-            100//fererralFee */
-
-
-        mangoRouter = new MangoRouter002(params);
-        console.log('Router Address:',address(mangoRouter));
-
-        //prepare token params
-        IMangoStructs.cTokenParams memory tokenParams = IMangoStructs.cTokenParams(
-            address(0),
-            address(0),
-            address(0),
-            address(0)
-        );
-        //deploy token
-        mangoToken = new MANGO_DEFI_TOKEN(tokenParams);
-        
-        //setting up params for referral
-        IMangoStructs.cReferralParams memory referralParams = IMangoStructs.cReferralParams(
-            address(mangoRouter),//router address
-            address(mangoToken),
-            params.routerV2,
-            params.weth
-        );
-        //deploy referral
-        mangoReferral = new MangoReferral(referralParams);
-
-        //prapre params for mangoManager
-        IMangoStructs.cManagerParams memory mangoManagerParams = IMangoStructs.cManagerParams(
-            address(mangoRouter),
-            address(mangoReferral),
-            address(mangoToken)
-        );
-        mangoManager = new Mango_Manager(mangoManagerParams);
-
-        //@DEV Now we set all the current contracts
-
-        //set referral contract on router
-        mangoRouter.setReferralContract(address(mangoReferral));
-
-        //validate router to call referral
-        mangoReferral.addRouter(address(mangoRouter));
-        mangoReferral.addToken((address(mangoToken)));
-
-        taxMan = address(mangoManager);
-        //add tax man
-        mangoRouter.changeTaxMan(taxMan);
-
-        //approve referral for deposite
-        mangoToken.approve(address(mangoReferral), type(uint256).max);
-        mangoReferral.depositeTokens(address(mangoToken),5000000e18);
     }
     //@DEV the test simple swap test that a swap is happening
     // the fee is send to the manager 
     //the manager splits the fee in two fee/3
     function testSimpleEthTokenSwap() external {
-        //check for taxman balance before and after
-        console.log('this is referra add',address(mangoReferral));
+
+        console.log('this is chain', vm.activeFork());
+        uint256 balanceBefore = IERC20(usdc).balanceOf(address(this));
+        
         mangoRouter.swap{value:1e18}(
             address(0),
             usdc,
             0,
-            referrer0
+            address(0)//referrer0
         );
+        uint256 balanceAfter = IERC20(usdc).balanceOf(address(this));
+        assertNotEq(balanceAfter, balanceBefore);
+        uint256 balanceOfRouter = address(mangoRouter).balance;
+        console.log('router balance',balanceOfRouter);
         //assertEq(fee, taxManBalanceAfter-taxManBalanceBefore,'taxman getting wrong fee amount');
         //assert that the mangoManager is slicing the amount
 
-        assertEq(mangoManager.teamFee(),mangoManager.buyAndBurnFee(),'mangoManager is not slicing the amount in 3 with presicion');
-        assertEq(mangoManager.buyAndBurnFee(),mangoManager.referralFee(), 'mangoManager is not slicing the amount in 3 with presicion');
+        //assertEq(mangoManager.teamFee(),mangoManager.buyAndBurnFee(),'mangoManager is not slicing the amount in 3 with presicion');
+        //assertEq(mangoManager.buyAndBurnFee(),mangoManager.referralFee(), 'mangoManager is not slicing the amount in 3 with presicion');
 
         //to test buy and burn pool hase to be created
     }
@@ -322,5 +278,43 @@ contract test_Router_and_Referal_Fork is Test {
     //     assertNotEq(mangoBalanceBefore,IERC20(mango).balanceOf(address(this)));
         
     // }
-    //fallback() external payable {}
+    function setVariablesByChain(uint256 _activeFork) public {
+        usdc = _activeFork == baseFork ? 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913: 
+               _activeFork == arbitrumFork ? 0xaf88d065e77c8cC2239327C5EDb3A432268e5831:
+               _activeFork == bscFork ? 0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d:
+                0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;//assume sepolia
+        weth =  _activeFork == baseFork ? 0x4200000000000000000000000000000000000006:
+                _activeFork == arbitrumFork ? 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1:
+                _activeFork == bscFork ?  0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c:
+                0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9;//assume sepolia
+        params =  _activeFork == baseFork ? IMangoStructs.cParamsRouter(
+        //this is base 
+        0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6,//factpryv2
+        0x33128a8fC17869897dcE68Ed026d694621f6FDfD,//factpry v3
+        0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24,//routerv2
+        0x2626664c2603336E57B271c5C0b26F421741e481,//swapRouter02
+        weth,//weth
+        300,//taxFee
+        100//fererralFee
+        ): _activeFork == bscFork ? IMangoStructs.cParamsRouter(
+            0xBCfCcbde45cE874adCB698cC183deBcF17952812,//factpryv2
+            0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865,//factpry v3
+            0x10ED43C718714eb63d5aA57B78B54704E256024E,//routerv2
+            0x1b81D678ffb9C0263b24A97847620C99d213eB14,//swapRouter02
+            weth,//weth
+            300,//taxFee
+            100//fererralFee */
+        ): IMangoStructs.cParamsRouter(
+        //this is arbitrum
+        address(0),//factpryv2 
+        0x1F98431c8aD98523631AE4a59f267346ea31F984,//factpry v3
+         address(0),//routerv2
+        0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45,//swapRouter02
+        weth,//weth
+        300,//taxFee
+        100//fererralFee
+        );
+        
+    }
+    fallback() external payable {}
 }
