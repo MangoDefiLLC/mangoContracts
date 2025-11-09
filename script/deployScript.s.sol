@@ -32,31 +32,13 @@ contract Deploy_Script is Script {
     address public taxMan;
     address public routerV2 = 0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3; //sepolia
     //                          BASE
-    IMangoStructs.cParamsRouter public params = IMangoStructs.cParamsRouter(
-        //     //this is base 
-            0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6,//factpryv2
-            0x33128a8fC17869897dcE68Ed026d694621f6FDfD,//factpry v3
-            0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24,//routerv2
-            0x2626664c2603336E57B271c5C0b26F421741e481,//swapRouter02
-            0x4200000000000000000000000000000000000006,//weth
-            300,//taxFee
-            100//fererralFee
-        // //bsc
-        //     0xBCfCcbde45cE874adCB698cC183deBcF17952812,//factpryv2
-        //     0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865,//factpry v3
-        //     0x10ED43C718714eb63d5aA57B78B54704E256024E,//routerv2
-        //     0x1b81D678ffb9C0263b24A97847620C99d213eB14,//swapRouter02
-        //     0x4200000000000000000000000000000000000006,//weth
-        //     300,//taxFee
-        //     100//fererralFee 
-    );
-
-
     string public BASE;
     string public BSC;
     string public SEPOLIA;
+    string public ARBITRUM;
     uint256 public baseFork;
     uint256 public sepoliaFork;
+    IMangoStructs.cParamsRouter public params;
     event Where(bool);    
 
     function setUp()external{
@@ -64,6 +46,7 @@ contract Deploy_Script is Script {
         BASE = vm.envString("BASE_RPC");
         SEPOLIA = vm.envString("SEPOLIA_RPC");
         BSC = vm.envString("BSC_RPC");
+        ARBITRUM = vm.envString("ARBITRUM_RPC");
         // baseFork = vm.createFork(BASE);
         // sepoliaFork = vm.createFork(SEPOLIA);
         //testForkIdDiffer();
@@ -78,7 +61,9 @@ contract Deploy_Script is Script {
 
     function run() public {
         vm.startBroadcast(pvk);
-        deployToken();//deployRouter();
+        //deployToken();//deployRouter();
+        setVariablesByChain(BASE);
+        deployRouter();
         vm.stopBroadcast();
         
     }
@@ -89,56 +74,7 @@ contract Deploy_Script is Script {
     }
 
     function deployEchoSystem() public {
-        //deploy router
-        //IMangoStructs.cParamsRouter memory params;
-        // = IMangoStructs.cParamsRouter(
-        //     //this is base 
-        //     0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6,//factpryv2
-        //     0x33128a8fC17869897dcE68Ed026d694621f6FDfD,//factpry v3
-        //     0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24,//routerv2
-        //     0x2626664c2603336E57B271c5C0b26F421741e481,//swapRouter02
-        //     0x4200000000000000000000000000000000000006,//weth
-        //     300,//taxFee
-        //     100//fererralFee
-        // );aa
-        //this is base 
-        // 0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6,//factpryv2
-        // 0x33128a8fC17869897dcE68Ed026d694621f6FDfD,//factpry v3
-        // 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24,//routerv2
-        // 0x2626664c2603336E57B271c5C0b26F421741e481,//swapRouter02
-        // 0x4200000000000000000000000000000000000006,//weth
-        // 300,//taxFee
-        // 100//fererralFee
-        //   sepolia
-        //     0xF62c03E08ada871A0bEb309762E260a7a6a880E6,//factpryv2
-        //     0x0227628f3F023bb0B980b67D528571c95c6DaC1c,//factoryV3
-        //     0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3,//routerV2
-        //     0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E,//swapRouter02
-        //     0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9,
-        //     300,//taxFee
-            // 100//fererralFee 
-        /**
-         //this is BSC
-            0xBCfCcbde45cE874adCB698cC183deBcF17952812,//factpryv2
-            0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865,//factpry v3
-            0x10ED43C718714eb63d5aA57B78B54704E256024E,//routerv2
-            0x1b81D678ffb9C0263b24A97847620C99d213eB14,//swapRouter02
-            0x4200000000000000000000000000000000000006,//weth
-            300,//taxFee
-            100//fererralFee 
-
-            ARBITRUM
-            0xf1D7CC64Fb4452F05c498126312eBE29f30Fbcf9//factoryV2
-            0x1F98431c8aD98523631AE4a59f267346ea31F984//factoryV3
-            0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24//routerV2
-            0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45//swapRouter02
-            0x82aF49447D8a07e3bd95BD0d56f35241523fBab1//weth
-            300,
-            100
-
-        */
-
-    
+ 
         mangoRouter = new MangoRouter002(params);
         console.log('Router Address:',address(mangoRouter));
 
@@ -198,7 +134,44 @@ contract Deploy_Script is Script {
         //deploy token
         mangoToken = new MANGO_DEFI_TOKEN(_params);
         console.log('this is mango token',address(mangoToken));
-        
+    }
+   
+    function setVariablesByChain(string memory _activeFork) public {
+        bytes32 activeFork = keccak256(abi.encodePacked(_activeFork));
 
+        //@DEV
+        //make a function to compare and not have this many line of the same code snipped
+        address weth =  activeFork == keccak256(abi.encodePacked(BASE)) ? 0x4200000000000000000000000000000000000006:
+                activeFork == keccak256(abi.encodePacked(ARBITRUM)) ? 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1:
+                activeFork == keccak256(abi.encodePacked(BSC)) ?  0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c:
+                0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9;//assume sepolia
+        params =  activeFork == keccak256(abi.encodePacked(BASE)) ? IMangoStructs.cParamsRouter(
+        //this is base 
+        0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6,//factpryv2
+        0x33128a8fC17869897dcE68Ed026d694621f6FDfD,//factpry v3
+        0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24,//routerv2
+        0x2626664c2603336E57B271c5C0b26F421741e481,//swapRouter02
+        weth,//weth
+        300,//taxFee
+        100//fererralFee
+        ): activeFork == keccak256(abi.encodePacked(BSC)) ? IMangoStructs.cParamsRouter(
+            0xBCfCcbde45cE874adCB698cC183deBcF17952812,//factpryv2
+            0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865,//factpry v3
+            0x10ED43C718714eb63d5aA57B78B54704E256024E,//routerv2
+            0x1b81D678ffb9C0263b24A97847620C99d213eB14,//swapRouter02
+            weth,//weth
+            300,//taxFee
+            100//fererralFee */
+        ): IMangoStructs.cParamsRouter(
+        //assume  arbitrum
+        address(0),//factpryv2 
+        0x1F98431c8aD98523631AE4a59f267346ea31F984,//factpry v3
+         address(0),//routerv2
+        0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45,//swapRouter02
+        weth,//weth
+        300,//taxFee
+        100//fererralFee
+        );
+        
     }
 }

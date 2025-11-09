@@ -12,13 +12,14 @@ import { IMangoReferral } from "./interfaces/IMangoReferral.sol";
 import { IWETH9 } from "./interfaces/IWETH9.sol";
 import { IMangoErrors } from "./interfaces/IMangoErrors.sol";
 import {IMangoStructs} from "./interfaces/IMangoStructs.sol";
+
 interface ISwapRouter02 {
     struct ExactInputSingleParams {
         address tokenIn;
         address tokenOut;
         uint24 fee;
         address recipient;
-        uint256 deadline;
+        //uint256 deadline;
         uint256 amountIn;
         uint256 amountOutMinimum;
         uint160 sqrtPriceLimitX96;
@@ -289,7 +290,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                 tokenOut: data.token1, //token in return
                 fee: data.poolFee,//poolFee
                 recipient: data.receiver, //reciever of the output token
-                deadline: block.timestamp + 2,
+                //deadline: block.timestamp + 2,
                 amountIn: data.amount,// amont of input token you want to swap
                 amountOutMinimum: 0, //set to zero in this case
                 sqrtPriceLimitX96: 0 //set to zero
