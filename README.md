@@ -1,7 +1,7 @@
 ## MAngo Defi Contracts
 mango defi contracts are the bread and butter of mango echosystem.
 
-##Mango Router##
+# Mango Router
 router is the contract designe to interact with protocols like uniswap, pancake swap and aerodrome and perfomr swaps
 Funcitions:
 ***swap***
