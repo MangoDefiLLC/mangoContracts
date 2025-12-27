@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 //THIS MODULE IS MENT TO MANAGE FEES FROM MANGO ROUTER AND TOKENS TAX
 //FUNCTIONS:
-//BUY AND BURN //BUY X AMOUNT OF THE HOLDING AND BURN
+//BUY AND BURN :BUY X AMOUNT OF THE HOLDING AND BURN
 //SEND X AMOUNT OF HOLDING TO OWNER
 //buy and fund the referral
 //@STATE VARS:
@@ -26,9 +26,9 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
     IMangoReferral public mangoReferral;
 
     //fees commming in have to be separates in to 3 vars
-    uint256 public teamFee;
-    uint256 public buyAndBurnFee;
-    uint256 public referralFee;
+    uint16 public teamFee;
+    uint16 public buyAndBurnFee;
+    uint16 public referralFee;
     uint256 public totalFeesCollected;//slot 7
     uint256 public totalBurned;
     uint256 public constant BASIS_POINTS = 10000;
@@ -56,7 +56,7 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
         //call the burn function in the erc20 token contract
         mangoToken.burn(amountToBurn);
 
-        buyAndBurnFee -= amount;
+        buyAndBurnFee -= uint16(amount);
         totalBurned += amount;
     }
     function fundReferral(uint256 amount)external{
@@ -78,7 +78,7 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
             )
         );
         if(!s) revert IMangoErrors.ReferralFundingFailed();
-        referralFee -= amount;
+        referralFee -= uint16(amount);
         //send Mango tokens to referral
         //call deposite on referral
     }
@@ -94,7 +94,7 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
 
     //of the amount comming in is the 3% fee wish is divided by 3 (1% each)
     function _setFees(uint256 amount) private {
-        uint256 fee = (amount*BASIS_POINTS) / 3 / BASIS_POINTS;
+        uint16 fee = uint16((amount*BASIS_POINTS) / 3 / BASIS_POINTS);
         teamFee = fee;
         buyAndBurnFee = fee;
         referralFee = fee;

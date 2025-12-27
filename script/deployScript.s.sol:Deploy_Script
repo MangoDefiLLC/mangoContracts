@@ -1,6 +1,6 @@
-Script started on Sat Nov  8 17:48:38 2025
+Script started on Wed Nov 12 11:44:29 2025
 Command: --rpc-url https://arb-mainnet.g.alchemy.com/v2/9K8pLtRv6cIHwhj_xcoy4rRVX2SFHu3K --broadcast --verify -vvvv --interactives 1
 script: --rpc-url: No such file or directory
 
 Command exit status: 1
-Script done on Sat Nov  8 17:48:38 2025
+Script done on Wed Nov 12 11:44:29 2025

@@ -36,6 +36,8 @@ mango defi contracts are the bread and butter of mango echosystem.
 
 **router** - smart contract to route and execute swaps.
 
+**Manager** - smart contract that will get fees from router and manage them
+
 **Referral** - smart contract to handle referral distribution.
 (The distribute and adding referral chain cant only be called by a valid router)
 
@@ -50,9 +52,9 @@ To get started with this repo
     git clone git@github.com:MangoDefiLLC/mangoContracts.git
     forge install
 ```
-## Run Test
+## Run Test for router SM
 ```
-forge test
+forge test -vvv
 ```
 
 
@@ -203,5 +205,5 @@ command to deploy mangoContracts % forge script script/DeployScript.s.sol:Deploy
 
 execute a tx that already happed and se the logs
 ```
-cast run <TX_HASH> --rpc-url <YOUR_RPC_URL> [--verbosity <LEVEL>]
+cast run 0xca53b18c543e1a6126574f68f9c4ada58a8c809e7cc453f2c115b1de76f0e528 --rpc-url <YOUR_RPC_URL> [--verbosity <LEVEL>]
 ```

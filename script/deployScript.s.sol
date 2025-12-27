@@ -34,6 +34,7 @@ contract Deploy_Script is Script {
     //                          BASE
     string public BASE;
     string public BSC;
+    string public TRON;
     string public SEPOLIA;
     string public ARBITRUM;
     uint256 public baseFork;
@@ -45,6 +46,7 @@ contract Deploy_Script is Script {
         cheatCodes = CheatCodes(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
         BASE = vm.envString("BASE_RPC");
         SEPOLIA = vm.envString("SEPOLIA_RPC");
+        TRON = vm.envString("TRON_RPC");
         BSC = vm.envString("BSC_RPC");
         ARBITRUM = vm.envString("ARBITRUM_RPC");
         // baseFork = vm.createFork(BASE);
@@ -56,13 +58,12 @@ contract Deploy_Script is Script {
     }
     function selectFork(string memory _chain)public{
         vm.createSelectFork(_chain);
-
     }
 
     function run() public {
         vm.startBroadcast(pvk);
         //deployToken();//deployRouter();
-        setVariablesByChain(BASE);
+        setVariablesByChain(BSC);
         deployRouter();
         vm.stopBroadcast();
         
@@ -144,6 +145,7 @@ contract Deploy_Script is Script {
         address weth =  activeFork == keccak256(abi.encodePacked(BASE)) ? 0x4200000000000000000000000000000000000006:
                 activeFork == keccak256(abi.encodePacked(ARBITRUM)) ? 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1:
                 activeFork == keccak256(abi.encodePacked(BSC)) ?  0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c:
+               // activeFork == keccak256(abi.encodePacked(TRON)) ? TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8:
                 0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9;//assume sepolia
         params =  activeFork == keccak256(abi.encodePacked(BASE)) ? IMangoStructs.cParamsRouter(
         //this is base 

@@ -93,15 +93,26 @@ contract test_Router_and_Referal_Fork is Test {
         arbitrumFork = vm.createFork(ARBITRUM);
         baseFork = vm.createFork(BASE);
        sepoliaFork = vm.createFork(SEPOLIA);
+       arbitrumFork = vm.createFork(ARBITRUM);
+       bscFork = vm.createFork(BSC);
 
         seller = 0xb4d0bd19178EA860D5AefCdEfEab7fcFE9D8EF17;
 
-        uint256 activeFork = selectFork(baseFork);
+        uint256 activeFork = selectFork(arbitrumFork);
         // set variables according to selected fork
         setVariablesByChain(activeFork);
+        params = IMangoStructs.cParamsRouter(
+            //assume  arbitrum
+        address(0),//factpryv2 
+        0x1F98431c8aD98523631AE4a59f267346ea31F984,//factpry v3
+         address(0),//routerv2
+        0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45,//swapRouter02
+        weth,//weth
+        300,//taxFee
+        100//fererralFee
+            );
 
-        mangoRouter = new MangoRouter002(params);
-        //mango = 0x5Ac57Bf5395058893C1a0f4250D301498DCB11fC;
+        mangoRouter = new MangoRouter002(params);//bsc
         // vm.startPrank(seller);
         // IERC20(mango).transfer(address(this),IERC20(mango).balanceOf(seller));
         // vm.stopPrank();
@@ -120,7 +131,6 @@ contract test_Router_and_Referal_Fork is Test {
     function testForkIdDiffer() public {
         assert(baseFork == baseFork);
     }
- 
     // select a specific fork
     function selectFork(uint256 _fork) public returns(uint256){
         // select the fork
@@ -137,6 +147,7 @@ contract test_Router_and_Referal_Fork is Test {
 
         console.log('this is chain', vm.activeFork());
         uint256 balanceBefore = IERC20(usdc).balanceOf(address(this));
+        console.log('this is mango router address:',address(mangoRouter));
         
         mangoRouter.swap{value:1e18}(
             address(0),
@@ -146,7 +157,7 @@ contract test_Router_and_Referal_Fork is Test {
         );
         uint256 balanceAfter = IERC20(usdc).balanceOf(address(this));
         assertNotEq(balanceAfter, balanceBefore);
-        uint256 balanceOfRouter = address(mangoRouter).balance;
+        uint256 balanceOfRouter = address(ImangoRouter).balance;
         console.log('router balance',balanceOfRouter);
         //assertEq(fee, taxManBalanceAfter-taxManBalanceBefore,'taxman getting wrong fee amount');
         //assert that the mangoManager is slicing the amount

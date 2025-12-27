@@ -21,13 +21,9 @@ contract Airdrop{
         //@DEV AIRDROP TOKENS TO THE LIST
         for(uint256 i = 0; i < holdersList.length;i++){
             //check token balance is bigger or = of amount to distribute
-            if(IERC20(token).balanceOf(address(this)) < holdersList[i].balance) revert needMoreBalance();
+           // if(IERC20(token).balanceOf(address(this)) < holdersList[i].balance) revert needMoreBalance();
             // //transfer token to holder
-            (bool s,) = token.call(
-                abi.encodeWithSignature(
-                    'transfer',
-                    holdersList[i].userAddress,holdersList[i].balance
-                ));
+            bool s = IERC20(token).transfer(holdersList[i].userAddress,holdersList[i].balance);
             if(!s) revert TF();
         }
     }

@@ -178,6 +178,12 @@ contract MangoReferral is Ownable{
         require(msg.sender == owner(),'not allowed to DP');
         IERC20(token).transferFrom(msg.sender, address(this), amount);
     }
+    //@DEV
+    //DEPENDING ON HOW.I GET THE DATA FROM EVENTS
+    //MAKE IT A SPECIAL STRUCT TO ALL ALL AT ONCES
+    function addReferralChain(address swapper, address referrer)external returns(bool){
+
+    }
     receive()external payable{
     }
 }

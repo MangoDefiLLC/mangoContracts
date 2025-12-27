@@ -19,7 +19,7 @@ interface ISwapRouter02 {
         address tokenOut;
         uint24 fee;
         address recipient;
-        //uint256 deadline;
+        uint256 deadline;
         uint256 amountIn;
         uint256 amountOutMinimum;
         uint160 sqrtPriceLimitX96;
@@ -42,8 +42,8 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     IRouterV2 public immutable routerV2;
     IWETH9 public immutable weth;
     address public taxMan; //receiver of the tax
-    uint256 public  referralFee;
-    uint256 public immutable BASIS_POINTS =  10000;
+    uint16 public  referralFee;
+    uint16 public immutable BASIS_POINTS =  10000;
 
     struct Path {
         address token0;
@@ -79,8 +79,8 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         swapRouter02 = ISwapRouter02(cParams.swapRouter02);//
         //ISwapRouter02(0x2626664c2603336E57B271c5C0b26F421741e481);
         weth = IWETH9(cParams.weth);
-        taxFee = cParams.taxFee;//%3 in basis points
-        referralFee = cParams.referralFee;//1% in basis points
+        taxFee = uint16(cParams.taxFee);//%3 in basis points
+        referralFee = uint16(cParams.referralFee);//1% in basis points
 
         //I WIll like to see how to make better the search of the pool
         //or jut route to a msart router
@@ -200,6 +200,15 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
             referrer));
         return s;
     }
+    //SWAP FUNCTION IS THE ENTRY POINT FOR SWAP INTERACTIONS
+    /*
+    *@PARAMS: 
+    * token0: address of the token to swap from (address(0) if ETH)
+    * token1: address of the token to swap to (address(0) if ETH)
+    * amount: amount of token0 to swap (0 if ETH is sent)
+    * referrer: address of the referrer (address(0) if no referrer)
+    @RETURN: Amount out from swap
+    */
     function swap(address token0, address token1,uint256 amount,address referrer) external payable returns(uint amountOut){
         if(msg.value == 0 && amount == 0) revert IMangoErrors.BothCantBeZero();
         if(msg.value > 0 && amount > 0) revert IMangoErrors.BothCantBeZero();
@@ -216,8 +225,12 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         path.token0 = token0;
         path.token1 = token1;
         //@dev this line is for cheking if swapper has been referr
-       // path.referrer =  referrer == address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
-        path.referrer = referrer;//by default referrer is address 0 
+        if(address(mangoReferral) == address(0)){
+            path.referrer = address(0);
+        }else{
+            path.referrer =  referrer == address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
+        }
+        //by default referrer is address 0 
             //find the v3 pool
              bool found;
              address pair;
@@ -290,7 +303,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                 tokenOut: data.token1, //token in return
                 fee: data.poolFee,//poolFee
                 recipient: data.receiver, //reciever of the output token
-                //deadline: block.timestamp + 2,
+                deadline: block.timestamp + 2,
                 amountIn: data.amount,// amont of input token you want to swap
                 amountOutMinimum: 0, //set to zero in this case
                 sqrtPriceLimitX96: 0 //set to zero
