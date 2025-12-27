@@ -8,8 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IMangoStructs} from "../contracts/interfaces/IMangoStructs.sol";
 import {MangoReferral} from '../contracts/mangoReferral.sol';
 import {Mango_Manager} from "../contracts/manager.sol";
-import {IDexLauncher} from "../contracts/interfaces/IDexLauncher.sol";
-import {DexLauncher} from "../contracts/poolLauncher.sol";
+
 interface CheatCodes {
            function prank(address) external;    
  }
@@ -21,6 +20,18 @@ interface CheatCodes {
             int24 tickHigher;
             int24 poolTick;
         }
+/*
+@DEV:
+* This script will deploy the mango ecosystem contracts:
+* -Mango Token
+* -Mango Router
+* -Mango Referral
+* -Mango Manager
+* It will also set the necessary variables between them
+@NOTICE:
+*we can also deploy individual contracts of the ecosystem
+
+ */
 contract Deploy_Script is Script {
 
     MangoRouter002 public mangoRouter;
