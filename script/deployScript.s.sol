@@ -131,9 +131,9 @@ contract Deploy_Script is Script {
         //add tax man
         mangoRouter.changeTaxMan(taxMan);
 
-        //approve referral for deposite
+        //approve referral for deposit
         mangoToken.approve(address(mangoReferral), type(uint256).max);
-        mangoReferral.depositeTokens(address(mangoToken),5000000e18);
+        mangoReferral.depositTokens(address(mangoToken),5000000e18);
     }
     function deployToken() public {
 

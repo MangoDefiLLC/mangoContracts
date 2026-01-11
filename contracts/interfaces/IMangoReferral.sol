@@ -9,7 +9,7 @@ interface IMangoReferral {
 
         function addRouter(address router) external;
 
-        function depositeTokens(address token, uint256 amount) external;
+        function depositTokens(address token, uint256 amount) external;
 
         function addToken(address token) external;
         function distributeReferralRewards(

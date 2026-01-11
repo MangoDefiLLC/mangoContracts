@@ -90,7 +90,7 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
     
         (bool s,) = address(mangoReferral).call(
             abi.encodeWithSignature(
-                "depositeTokens(address,uint256)", // Fixed signature (no spaces, no 'function' keyword)
+                "depositTokens(address,uint256)", // Fixed typo: depositeTokens -> depositTokens
                 address(mangoToken),
                 amountOut
             )

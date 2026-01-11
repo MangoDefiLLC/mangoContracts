@@ -244,7 +244,14 @@ contract MangoReferral is Ownable{
         whiteListed[router] = true;
 
     }
-    function depositeTokens(address token, uint256 amount) public {
+    /**
+     * @notice Deposits ERC20 tokens into the referral contract
+     * @dev Allows owner to deposit tokens for referral reward distribution
+     * @param token Address of the token to deposit
+     * @param amount Amount of tokens to deposit
+     * @custom:security Only owner can call
+     */
+    function depositTokens(address token, uint256 amount) public {
         require(msg.sender == owner(),'not allowed to DP');
         IERC20(token).transferFrom(msg.sender, address(this), amount);
     }
