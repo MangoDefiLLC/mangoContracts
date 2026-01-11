@@ -254,19 +254,17 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
             referrer));
         return s;
     }
-    //SWAP FUNCTION IS THE ENTRY POINT FOR SWAP INTERACTIONS
-    /*
-    *@PARAMS: 
-    * token0: address of the token to swap from (address(0) if ETH)
-    * token1: address of the token to swap to (address(0) if ETH)
-    * amount: amount of token0 to swap (0 if ETH is sent)
-    * referrer: address of the referrer (address(0) if no referrer)
-    @RETURN: Amount out from swap
-    *@SECURITY: Uses checks-effects-interactions pattern:
-    *   1. Checks: Validate inputs
-    *   2. Effects: Calculate paths and amounts (no state changes)
-    *   3. Interactions: External swaps, then payments (user -> referral -> taxMan)
-    */
+    /**
+     * @notice Executes a token swap through the router, aggregating liquidity from Uniswap V2/V3
+     * @dev This function handles ETH/token swaps, applies fees, and distributes referral rewards.
+     *      Uses checks-effects-interactions pattern for security. Supports both V2 and V3 pools.
+     * @param token0 Address of the input token (address(0) for ETH)
+     * @param token1 Address of the output token (address(0) for ETH)
+     * @param amount Amount of token0 to swap (0 if sending ETH via msg.value)
+     * @param referrer Address of the referrer (address(0) if no referrer)
+     * @return amountOut Amount of output tokens/ETH received after fees
+     * @custom:security Uses nonReentrant modifier and checks-effects-interactions pattern
+     */
     function swap(address token0, address token1,uint256 amount,address referrer) 
         external 
         payable 

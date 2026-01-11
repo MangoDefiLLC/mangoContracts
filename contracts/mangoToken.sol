@@ -49,6 +49,11 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
     }
     //**THE TAXES FOR THIS IS DESIGNE FOR V2, V3 NEEDS TO BE ADDED AND TESTED */
     //** V2 PAIR MANAGEMENT **//
+    /**
+     * @notice Adds a Uniswap V2 pair address to enable tax calculation for sells
+     * @dev When tokens are transferred to a registered pair, it's considered a sell transaction
+     * @param pair Address of the Uniswap V2 pair
+     */
     function addPair(address pair) external onlyOwner {
         require(pair != address(0), "Invalid pair address");
         isPair[pair] = true;

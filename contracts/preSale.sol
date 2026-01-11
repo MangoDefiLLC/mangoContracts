@@ -52,6 +52,12 @@ contract Presale {
      function _referalFee(uint256 amount) private pure returns (uint256 referalPay){//this amount is the 3% for taxMan
         referalPay = amount * 100 / 10000; 
     }
+    /**
+     * @notice Allows users to purchase MANGO tokens with ETH during the presale
+     * @dev Calculates token amount based on current price, handles referral rewards, and enforces max buy limit
+     * @param _referrer Address of the referrer (address(0) to check referral contract for existing referrer)
+     * @custom:security Requires presale to be active. Max buy limit of 5 ETH. Applies 3% tax and 1% referral fee.
+     */
     function buyTokens(address _referrer) public payable {
         require(!presaleEnded, "Presale ended");
         require(msg.value > 0, "Send ETH to buy tokens");
@@ -76,6 +82,12 @@ contract Presale {
             emit ReferralPayout(referralFeeAmount);
         }
     }
+    /**
+     * @notice Calculates the amount of MANGO tokens a user will receive for a given ETH amount
+     * @dev Uses the current presale price to calculate token amount. Multiplies before dividing for precision.
+     * @param amount Amount of ETH (in wei) to calculate tokens for
+     * @return tokensToReceive Amount of MANGO tokens that will be received
+     */
     function getAmountOutETH(uint256 amount) public view returns (uint256 tokensToReceive) {
             //if fund is less than 135 eth price1
             require(PRICE > 0, "Price not set");

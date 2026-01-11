@@ -73,11 +73,19 @@ contract MangoReferral is Ownable{
                     revert("Price oracle unavailable - MANGO/WETH pool not found");
                 }
     }
-    ///CREATE FUNCTION TO
+    /**
+     * @notice Distributes referral rewards to the referral chain
+     * @dev Converts input amount (ETH) to MANGO tokens using Uniswap price oracle, then distributes
+     *      rewards across up to 5 levels of referrers. Only callable by whitelisted routers.
+     * @param userAddress Address of the user who initiated the swap
+     * @param inputAmount Amount of ETH to distribute (will be converted to MANGO tokens)
+     * @param referrer Address of the direct referrer (address(0) if none)
+     * @custom:security Only whitelisted routers can call. Prevents duplicate rewards in circular chains.
+     */
     function distributeReferralRewards(
-        address userAddress,//msg.sender the one initiated the swap
-        uint256 inputAmount,//amount to distribute IF THIS AMOUNT IS NOT 0, SWAP TOKEN TO ETH
-        address referrer// the referrer
+        address userAddress,
+        uint256 inputAmount,
+        address referrer
     ) external payable {
         require(whiteListed[msg.sender],'only mango routers can call Distribution');
         uint256 mangoTokensAmount = _getMangoAmountETH(inputAmount);
@@ -191,20 +199,45 @@ contract MangoReferral is Ownable{
         emit DistributedAmount(totalRewardsToDistribute);
         return rewards;
     }
+    /**
+     * @notice Withdraws ERC20 tokens from the contract to the owner
+     * @dev Allows owner to recover tokens sent to the contract
+     * @param token Address of the token to withdraw
+     * @param amount Amount of tokens to withdraw
+     * @custom:security Only owner can call
+     */
     function withDrawTokens(address token,uint256 amount) external{
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         require(IERC20(token).transfer(owner(),amount),'transfer failed!');
     }
+    /**
+     * @notice Withdraws ETH from the contract to the owner
+     * @dev Allows owner to recover ETH sent to the contract
+     * @param amount Amount of ETH (in wei) to withdraw
+     * @custom:security Only owner can call
+     */
     function ethWithdraw(uint256 amount) external{
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         (bool s,) = owner().call{value:amount}("");
         require(s);
     }
+    /**
+     * @notice Updates the MANGO token address used for reward distribution
+     * @dev Allows owner to change the token contract if needed
+     * @param token Address of the new MANGO token contract
+     * @custom:security Only owner can call. Validates zero address.
+     */
     function addToken(address token) external {
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         require(token != address(0), "Invalid token address");
         mangoToken = IERC20(token);
     }
+    /**
+     * @notice Adds a router address to the whitelist for calling distributeReferralRewards
+     * @dev Only whitelisted routers can call the distributeReferralRewards function
+     * @param router Address of the router to whitelist
+     * @custom:security Only owner can call. Validates zero address.
+     */
     function addRouter(address router) external {
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         require(router != address(0), "Invalid router address");

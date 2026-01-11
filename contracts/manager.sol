@@ -71,6 +71,12 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
         buyAndBurnFee -= amount;
         totalBurned += amount;
     }
+    /**
+     * @notice Funds the referral contract with MANGO tokens using accumulated referralFee
+     * @dev Purchases MANGO tokens with ETH from referralFee and deposits them into the referral contract
+     * @param amount Amount of ETH (in wei) to use for purchasing and funding tokens
+     * @custom:security Only owner can call. Ensures referral contract has sufficient tokens for rewards.
+     */
     function fundReferral(uint256 amount)external{
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         if(amount > referralFee) revert IMangoErrors.AmountExceedsFee();
