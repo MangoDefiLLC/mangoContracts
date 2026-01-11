@@ -29,9 +29,10 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
     uint16 public teamFee;
     uint16 public buyAndBurnFee;
     uint16 public referralFee;
+    uint16 public constant BASIS_POINTS = 10000;
     uint256 public totalFeesCollected;//slot 7
     uint256 public totalBurned;
-    uint256 public constant BASIS_POINTS = 10000;
+
 
     event FeesReceived(uint256 totalAmount);
 
