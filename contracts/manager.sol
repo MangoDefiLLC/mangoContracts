@@ -49,10 +49,9 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
         //or only owner
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         if(amount > buyAndBurnFee) revert IMangoErrors.AmountExceedsFee();
-
-        _buyMango(amount);
-        //assume this contract has 0 mango
-        uint256 amountToBurn = mangoToken.balanceOf(address(this));
+        //burn amount of tokens aquired
+        uint256 amountToBurn = _buyMango(amount);
+     
         //call the burn function in the erc20 token contract
         mangoToken.burn(amountToBurn);
 
