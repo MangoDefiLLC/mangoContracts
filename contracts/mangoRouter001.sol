@@ -41,8 +41,11 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
 
     IRouterV2 public immutable routerV2;
     IWETH9 public immutable weth;
+    // Storage packed: address (20 bytes) + uint16 (2 bytes) + uint16 (2 bytes) = 24 bytes in Slot 0
+    // This saves storage slots (~20,000 gas on first write, ~5,000 gas on subsequent writes)
     address public taxMan; //receiver of the tax
-    uint16 public  referralFee;
+    uint16 public referralFee; // Packed with taxMan in same slot (bytes 20-21)
+    uint16 public taxFee; // Packed with taxMan and referralFee in same slot (bytes 22-23)
     uint16 public immutable BASIS_POINTS =  10000;
     uint256 public constant DEFAULT_SLIPPAGE_TOLERANCE = 500; // 5% slippage tolerance in basis points (500/10000 = 5%)
 
@@ -67,18 +70,20 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     event ReferralPayout(uint256 indexed amountToReferral);
     event payTaxMan(uint256 indexed amountToTaxMan);
    
-    uint256[] public poolFees;
-    uint256 public taxFee;
+    // Storage optimized: Fixed-size array (always 4 elements) stored in bytecode as immutable
+    // Standard Uniswap V3 fee tiers: 100 (0.01%), 500 (0.05%), 3000 (0.3%), 10000 (1%)
+    // Using uint24 since Uniswap V3 fees are uint24
+    uint24[4] public immutable poolFees = [uint24(100), uint24(500), uint24(3000), uint24(10000)];
 
     event NewOwner(address indexed newOwner);
    
     constructor(IMangoStructs.cParamsRouter memory cParams) Ownable() {
         //owner = msg.sender;
-        require(cParams.factoryV2 != address(0), "Invalid factoryV2");
-        require(cParams.factoryV3 != address(0), "Invalid factoryV3");
-        require(cParams.routerV2 != address(0), "Invalid routerV2");
-        require(cParams.swapRouter02 != address(0), "Invalid swapRouter02");
-        require(cParams.weth != address(0), "Invalid weth");
+        if(cParams.factoryV2 == address(0)) revert IMangoErrors.InvalidAddress();
+        if(cParams.factoryV3 == address(0)) revert IMangoErrors.InvalidAddress();
+        if(cParams.routerV2 == address(0)) revert IMangoErrors.InvalidAddress();
+        if(cParams.swapRouter02 == address(0)) revert IMangoErrors.InvalidAddress();
+        if(cParams.weth == address(0)) revert IMangoErrors.InvalidAddress();
         
         factoryV2 = IUniswapV2Factory(cParams.factoryV2);
         factoryV3 = IUniswapV3Factory(cParams.factoryV3);
@@ -91,14 +96,13 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
 
         //I WIll like to see how to make better the search of the pool
         //or jut route to a msart router
-        // Standard Uniswap V3 fee tiers: 100 (0.01%), 500 (0.05%), 3000 (0.3%), 10000 (1%)
-        poolFees = [100, 500, 3000, 10000];
+        // Note: poolFees is now immutable and set at declaration (optimized for gas)
         taxMan = msg.sender;//taxman is set to msg.sender until changed
         //ideally you want taxman to the the manager SMC
     }
     function changeTaxMan(address newTaxMan) external {
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
-        require(newTaxMan != address(0), "Invalid address");
+        if(newTaxMan == address(0)) revert IMangoErrors.InvalidAddress();
         taxMan = newTaxMan;
     }
     function _transferEth(address receiver,uint256 amount) internal{
@@ -128,8 +132,14 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         }
     }
     function _tax(uint256 _amount) private view returns(uint256 amount){
-        uint256 taxAmount = (_amount * taxFee)/BASIS_POINTS;
-        amount = _amount - taxAmount;//amount is the amount to user de rest is the fee
+        // taxFee is uint16, will be promoted to uint256 in multiplication
+        uint256 taxAmount = (_amount * uint256(taxFee)) / BASIS_POINTS;
+        unchecked {
+            // Safe: taxAmount is calculated as (_amount * taxFee) / BASIS_POINTS
+            // Since taxFee <= BASIS_POINTS (10000), taxAmount <= _amount
+            // Therefore _amount - taxAmount cannot underflow
+            amount = _amount - taxAmount;//amount is the amount to user de rest is the fee
+        }
     }
      function _referalFee(uint256 amount) private view returns (uint256 referalPay){//this amount is the 3% for taxMan
         referalPay = (amount*referralFee)/BASIS_POINTS; 
@@ -178,17 +188,24 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                 
                 //ones user is paid check if user has referral
                 if(data.referrer > address(0)){
-                    uint256 referalPay = _referalFee(amountOut-amountToUser);//pass 3%
-                    //call distribute rewards on mango referral
-                    bool s = _distributeReferralRewards(msg.sender,referalPay,data.referrer);
-                    if(!s) revert IMangoErrors.CallDistributeFailed();
+                    unchecked {
+                        // Safe: amountToUser = _tax(amountOut), so amountToUser <= amountOut
+                        uint256 totalTax = amountOut - amountToUser;
+                        uint256 referalPay = _referalFee(totalTax);//pass 3%
+                        //call distribute rewards on mango referral
+                        bool s = _distributeReferralRewards(msg.sender,referalPay,data.referrer);
+                        if(!s) revert IMangoErrors.CallDistributeFailed();
 
-                    emit ReferralPayout(referalPay);
-                    //pay tax man
-                    uint256 taxManPay = (amountOut-amountToUser)-referalPay;
-                    _payTaxMan(taxManPay);
+                        emit ReferralPayout(referalPay);
+                        // Safe: referalPay is calculated from totalTax, so referalPay <= totalTax
+                        uint256 taxManPay = totalTax - referalPay;
+                        _payTaxMan(taxManPay);
+                    }
                 }else{
-                    _payTaxMan(amountOut-amountToUser);
+                    unchecked {
+                        // Safe: amountToUser = _tax(amountOut), so amountToUser <= amountOut
+                        _payTaxMan(amountOut - amountToUser);
+                    }
                 }
 
             }else{
@@ -199,14 +216,22 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                 
                 // Handle referral if present
                 if(data.referrer > address(0)){
-                    uint256 referalPay = _referalFee(amountOut-amountToUser);
-                    bool s = _distributeReferralRewards(msg.sender,referalPay,data.referrer);
-                    if(!s) revert IMangoErrors.CallDistributeFailed();
-                    emit ReferralPayout(referalPay);
-                    uint256 taxManPay = (amountOut-amountToUser)-referalPay;
-                    _payTaxMan(taxManPay);
+                    unchecked {
+                        // Safe: amountToUser = _tax(amountOut), so amountToUser <= amountOut
+                        uint256 totalTax = amountOut - amountToUser;
+                        uint256 referalPay = _referalFee(totalTax);
+                        bool s = _distributeReferralRewards(msg.sender,referalPay,data.referrer);
+                        if(!s) revert IMangoErrors.CallDistributeFailed();
+                        emit ReferralPayout(referalPay);
+                        // Safe: referalPay is calculated from totalTax, so referalPay <= totalTax
+                        uint256 taxManPay = totalTax - referalPay;
+                        _payTaxMan(taxManPay);
+                    }
                 }else{
-                    _payTaxMan(amountOut - amountToUser);
+                    unchecked {
+                        // Safe: amountToUser = _tax(amountOut), so amountToUser <= amountOut
+                        _payTaxMan(amountOut - amountToUser);
+                    }
                 }
             
             }
@@ -295,17 +320,23 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
             //find the v3 pool
              bool found;
              address pair;
-            for(uint256 i = 0;i<poolFees.length;i++){
+            // Optimized: Fixed-size array (always 4 elements), cache token addresses to avoid repeated checks
+            address token0Final = token0 == address(0) ? address(weth) : token0;
+            address token1Final = token1 == address(0) ? address(weth) : token1;
+            
+            // poolFees is immutable fixed-size array [4], use constant length
+            for(uint256 i = 0; i < 4; ) {
                 pair = factoryV3.getPool(
-                    token0  == address(0) ? address(weth):token0,
-                    token1 == address(0) ? address(weth) : token1,
-                    uint24(poolFees[i])//uniswap get a uint24 and my array has uint256 so i need to cast it
+                    token0Final,
+                    token1Final,
+                    poolFees[i]// Now uint24, no cast needed
                 );
                 if(pair > address(0)){
-                    path.poolFee = uint24(poolFees[i]);
+                    path.poolFee = poolFees[i];// Now uint24, no cast needed
                     found = true;
                     break;
                 }
+                unchecked { ++i; }  // Safe: i < poolFeesLength, will not overflow
             }
             if(found){
                 amountOut = _swap(path);
@@ -322,7 +353,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                     //IF AMOUNT != 0 THEN IT WILL BE TAKEN AS IF TOKEN0 IS A ERC20 
                     amountOut = _swap(path);
                 }else{
-                    revert('no path found');
+                    revert IMangoErrors.NoPathFound();
                 }
                 
             }
@@ -437,7 +468,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     }
     function setReferralContract(address referalAdd) external {
        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
-        require(referalAdd != address(0), "Invalid address");
+        if(referalAdd == address(0)) revert IMangoErrors.InvalidAddress();
         mangoReferral = IMangoReferral(referalAdd);
     }
     function withdrawEth() external{
@@ -456,6 +487,6 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
      * @dev Router should only receive ETH through swap functions
      */
     fallback() external payable {
-        revert("Direct ETH deposits not allowed");
+        revert IMangoErrors.DirectETHDepositsNotAllowed();
     }
 }

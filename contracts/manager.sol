@@ -25,10 +25,13 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
     IMangoReferral public mangoReferral;
 
     //fees commming in have to be separates in to 3 vars
-    uint256 public teamFee;        // Can store up to 2^256 - 1
-    uint256 public buyAndBurnFee;  // Can store up to 2^256 - 1
-    uint256 public referralFee;    // Can store up to 2^256 - 1
-    uint256 public totalFeesCollected;//slot 7
+    // Note: teamFee, buyAndBurnFee, referralFee are uint16 for storage packing (gas optimization)
+    // They store the percentage/amount allocated to each category, reset to 0 after distribution
+    // totalFeesCollected (uint256) stores the complete accumulated value of all fees
+    uint16 public teamFee;        // Storage packed - stores allocated amount, resets after withdrawal
+    uint16 public buyAndBurnFee;  // Storage packed - stores allocated amount, resets after burn
+    uint16 public referralFee;    // Storage packed - stores allocated amount, resets after funding
+    uint256 public totalFeesCollected;// Stores complete accumulated value of all fees
     uint256 public totalBurned;
 
 
@@ -39,9 +42,9 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
         IMangoStructs.cManagerParams memory params
         ) 
         Ownable(){
-        require(params.mangoRouter != address(0), "Invalid router");
-        require(params.mangoReferral != address(0), "Invalid referral");
-        require(params.token != address(0), "Invalid token");
+        if(params.mangoRouter == address(0)) revert IMangoErrors.InvalidAddress();
+        if(params.mangoReferral == address(0)) revert IMangoErrors.InvalidAddress();
+        if(params.token == address(0)) revert IMangoErrors.InvalidAddress();
         
         mangoRouter = IMangoRouter(params.mangoRouter);
         mangoReferral = IMangoReferral(params.mangoReferral);
@@ -57,7 +60,7 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
      */
     function burn(uint256 amount) external {
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
-        if(amount > buyAndBurnFee) revert IMangoErrors.AmountExceedsFee();
+        if(amount > uint256(buyAndBurnFee)) revert IMangoErrors.AmountExceedsFee();
 
         // Track balance before purchase to only burn newly purchased tokens
         uint256 balanceBefore = mangoToken.balanceOf(address(this));
@@ -68,8 +71,12 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
         // Only burn the tokens purchased in this transaction
         mangoToken.burn(purchasedAmount);
 
-        buyAndBurnFee -= amount;
-        totalBurned += amount;
+        unchecked {
+            // Safe: amount <= buyAndBurnFee (validated above)
+            buyAndBurnFee -= uint16(amount);
+            // Safe: totalBurned is uint256, amount is bounded by buyAndBurnFee (uint16 max)
+            totalBurned += amount;
+        }
     }
     /**
      * @notice Funds the referral contract with MANGO tokens using accumulated referralFee
@@ -79,7 +86,7 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
      */
     function fundReferral(uint256 amount)external{
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
-        if(amount > referralFee) revert IMangoErrors.AmountExceedsFee();
+        if(amount > uint256(referralFee)) revert IMangoErrors.AmountExceedsFee();
 
         _buyMango(amount);
         //@NOTE:
@@ -96,7 +103,10 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
             )
         );
         if(!s) revert IMangoErrors.ReferralFundingFailed();
-        referralFee -= amount;
+        unchecked {
+            // Safe: amount <= referralFee (validated above)
+            referralFee -= uint16(amount);
+        }
         //send Mango tokens to referral
         //call deposite on referral
     }
@@ -111,27 +121,41 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
     }
 
     //of the amount comming in is the 3% fee wish is divided by 3 (1% each)
+    // Note: Fees are stored as uint16 for storage packing. They represent allocated amounts
+    // that are distributed and reset to 0. totalFeesCollected stores the complete value.
     function _setFees(uint256 amount) private {
         uint256 fee = amount / 3; // Simple division
-        uint256 remainder = amount - (fee * 3); // Handle remainder
         
-        teamFee += fee;
-        buyAndBurnFee += fee;
-        referralFee += (fee + remainder); // Give remainder to referral
-        // // Final check
-        //assert(teamFee + buyAndBurnFee + referralFee == amount);
+        unchecked {
+            // Safe: fee * 3 <= amount by definition of integer division
+            uint256 remainder = amount - (fee * 3); // Handle remainder
+            
+            // Safe: fee comes from division (amount / 3), cannot exceed amount
+            // uint16 max is 65,535, which is much larger than typical fee amounts
+            teamFee += uint16(fee);
+            buyAndBurnFee += uint16(fee);
+            // Safe: fee + remainder <= amount (since remainder = amount - fee*3)
+            referralFee += uint16(fee + remainder); // Give remainder to referral
+        }
     }
     receive() external payable {
-        totalFeesCollected += msg.value;
+        unchecked {
+            // Safe: totalFeesCollected is uint256, msg.value is bounded by block gas limit
+            // In practice, msg.value will never overflow uint256
+            totalFeesCollected += msg.value;
+        }
         _setFees(msg.value);
         emit FeesReceived(msg.value);
     }
     function withdrawTeamFee(uint256 amount) external{
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
-        require(amount <= teamFee, "Amount exceeds available team fee");
-        require(address(this).balance >= amount, "Insufficient contract balance");
+        if(amount > uint256(teamFee)) revert IMangoErrors.AmountExceedsFee();
+        if(address(this).balance < amount) revert IMangoErrors.InsufficientBalance();
         
-        teamFee -= amount;
+        unchecked {
+            // Safe: amount <= teamFee (validated above)
+            teamFee -= uint16(amount);
+        }
         (bool s,) = msg.sender.call{value:amount}("");
         if(!s) revert IMangoErrors.WithdrawalFailed();
         

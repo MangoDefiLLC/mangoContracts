@@ -42,10 +42,10 @@ contract MangoReferral is Ownable{
     //WARNING MANGO REFERRAL DOESNT GET PRICE FROM POOL
 
      constructor(IMangoStructs.cReferralParams memory params) Ownable(){//owner is dev wallet 
-         require(params.mangoRouter != address(0), "Invalid router");
-         require(params.mangoToken != address(0), "Invalid token");
-         require(params.routerV2 != address(0), "Invalid routerV2");
-         require(params.weth != address(0), "Invalid weth");
+         if(params.mangoRouter == address(0)) revert IMangoErrors.InvalidAddress();
+         if(params.mangoToken == address(0)) revert IMangoErrors.InvalidAddress();
+         if(params.routerV2 == address(0)) revert IMangoErrors.InvalidAddress();
+         if(params.weth == address(0)) revert IMangoErrors.InvalidAddress();
          
          //0x49f2f071B1Ac90eD1DB1426EA01cA4C145c45d48;//
          whiteListed[params.mangoRouter] = true;//0x9E1672614377bBfdafADD61fB3Aa1897586D0903
@@ -70,7 +70,7 @@ contract MangoReferral is Ownable{
                     mangoTokensAmount = amounts[1];
                 } catch {
                     // Fallback: Revert with clear error if pool doesn't exist or oracle fails
-                    revert("Price oracle unavailable - MANGO/WETH pool not found");
+                    revert IMangoErrors.PriceOracleUnavailable();
                 }
     }
     /**
@@ -132,7 +132,8 @@ contract MangoReferral is Ownable{
         address currentUser = userAddress;
 
         // Traverse up to 5 levels of referrers
-        for (uint8 i = 0; i < 5; i++) {
+        // Optimized: Use unchecked increment (safe: i < 5, will not overflow uint8)
+        for (uint8 i = 0; i < 5; ) {
             // Get the referrer of the current user
             address currentReferrer = referralChain[currentUser];
 
@@ -143,18 +144,22 @@ contract MangoReferral is Ownable{
 
             // Prevent duplicate rewards: Check if this referrer has already been added to rewards
             // This handles circular referral chains (e.g., A→B→C→A where A appears multiple times)
+            // Optimized: Cache chainLength for inner loop
             bool alreadyProcessed = false;
-            for (uint8 j = 0; j < chainLength; j++) {
+            uint8 cachedChainLength = chainLength;
+            for (uint8 j = 0; j < cachedChainLength; ) {
                 if (rewards[j].referrerAddress == currentReferrer) {
                     alreadyProcessed = true;
                     break;
                 }
+                unchecked { ++j; }  // Safe: j < cachedChainLength, will not overflow
             }
 
             // Skip if this referrer has already been processed in this distribution
             if (alreadyProcessed) {
                 // Move to next referrer but don't add duplicate reward
                 currentUser = currentReferrer;
+                unchecked { ++i; }  // Safe: i < 5, will not overflow uint8
                 continue;
             }
 
@@ -178,6 +183,7 @@ contract MangoReferral is Ownable{
 
             // Move to the next referrer
             currentUser = currentReferrer;
+            unchecked { ++i; }  // Safe: i < 5, will not overflow uint8
         }
         // Check if we have enough balance to distribute all rewards
         require(
@@ -185,7 +191,9 @@ contract MangoReferral is Ownable{
             "Insufficient mango token balance for all rewards"
         );
         // Distribute rewards
-        for (uint8 i = 0; i < chainLength; i++) {
+        // Optimized: Cache chainLength and use unchecked increment
+        uint8 cachedChainLength = chainLength;
+        for (uint8 i = 0; i < cachedChainLength; ) {
             ReferralReward memory reward = rewards[i];
             // Transfer tokens to the referrer
             require(
@@ -194,6 +202,7 @@ contract MangoReferral is Ownable{
             );
             // Update lifetime earnings for this referrer
             lifeTimeEarnings[reward.referrerAddress] += reward.amount;
+            unchecked { ++i; }  // Safe: i < cachedChainLength, will not overflow
         }
         // Emit event once after all transfers complete
         emit DistributedAmount(totalRewardsToDistribute);
@@ -229,7 +238,7 @@ contract MangoReferral is Ownable{
      */
     function addToken(address token) external {
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
-        require(token != address(0), "Invalid token address");
+        if(token == address(0)) revert IMangoErrors.InvalidAddress();
         mangoToken = IERC20(token);
     }
     /**
@@ -240,7 +249,7 @@ contract MangoReferral is Ownable{
      */
     function addRouter(address router) external {
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
-        require(router != address(0), "Invalid router address");
+        if(router == address(0)) revert IMangoErrors.InvalidAddress();
         whiteListed[router] = true;
 
     }
@@ -260,9 +269,9 @@ contract MangoReferral is Ownable{
     //MAKE IT A SPECIAL STRUCT TO ALL ALL AT ONCES
     function addReferralChain(address swapper, address referrer)external returns(bool){
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
-        require(swapper != address(0), "Invalid swapper address");
-        require(referrer != address(0), "Invalid referrer address");
-        require(swapper != referrer, "Cannot refer yourself");
+        if(swapper == address(0)) revert IMangoErrors.InvalidAddress();
+        if(referrer == address(0)) revert IMangoErrors.InvalidAddress();
+        if(swapper == referrer) revert IMangoErrors.CannotReferYourself();
         require(
             referralChain[swapper] == address(0), 
             "Referral chain already exists"
@@ -277,6 +286,6 @@ contract MangoReferral is Ownable{
      * @dev ETH sent here can only be recovered by owner via ethWithdraw()
      */
     receive() external payable {
-        revert("ETH not accepted in referral contract");
+        revert IMangoErrors.ETHNotAccepted();
     }
 }

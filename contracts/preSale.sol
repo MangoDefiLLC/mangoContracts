@@ -4,6 +4,7 @@ pragma solidity ^0.8.17;
 //60000000000000000000000000000 60b
 import {IERC20} from "./interfaces/IERC20.sol";
 import {IMangoReferral} from './interfaces/IMangoReferral.sol';
+import {IMangoErrors} from './interfaces/IMangoErrors.sol';
 
 contract Presale {
     address public immutable owner;
@@ -30,9 +31,9 @@ contract Presale {
         address _weth,
         address _mangoReferral
     ) {
-        require(_mango != address(0), "Invalid mango address");
-        require(_weth != address(0), "Invalid weth address");
-        require(_mangoReferral != address(0), "Invalid referral address");
+        if(_mango == address(0)) revert IMangoErrors.InvalidAddress();
+        if(_weth == address(0)) revert IMangoErrors.InvalidAddress();
+        if(_mangoReferral == address(0)) revert IMangoErrors.InvalidAddress();
         
         owner = msg.sender;
         mango = _mango;
@@ -59,19 +60,27 @@ contract Presale {
      * @custom:security Requires presale to be active. Max buy limit of 5 ETH. Applies 3% tax and 1% referral fee.
      */
     function buyTokens(address _referrer) public payable {
-        require(!presaleEnded, "Presale ended");
-        require(msg.value > 0, "Send ETH to buy tokens");
-        require(msg.value < 5e18,'amount exeds max buy');
+        if(presaleEnded) revert IMangoErrors.PresaleEnded();
+        if(msg.value == 0) revert IMangoErrors.InvalidAmount();
+        if(msg.value >= 5e18) revert IMangoErrors.AmountExceedsMaxBuy();
 
         //IF REFERRER IS NOS PASS STILL CHECK THE REFERRAL CONTRACT
         //TO SEE IF MSG.SENDER IS REFFEREE
         address referrer =  _referrer == address(0) ? mangoReferral.getReferralChain(msg.sender) : _referrer;
         
-        totalEthRaised += msg.value;
+        unchecked {
+            // Safe: totalEthRaised is uint256, msg.value is bounded by block gas limit
+            // In practice, msg.value will never overflow uint256 (max uint256 is astronomical)
+            totalEthRaised += msg.value;
+        }
         uint256 tokensToReceive = getAmountOutETH(msg.value);
-        tokensSold += tokensToReceive;
+        unchecked {
+            // Safe: tokensSold is uint256, tokensToReceive is calculated from msg.value
+            // tokensToReceive is bounded by msg.value and price, cannot overflow uint256
+            tokensSold += tokensToReceive;
+        }
         
-        require(IERC20(mango).transfer(msg.sender, tokensToReceive), "Token transfer failed");
+        if(!IERC20(mango).transfer(msg.sender, tokensToReceive)) revert IMangoErrors.TransferFailed();
         emit TokensPurchased(msg.sender, msg.value, tokensToReceive);
 
         //handle referral pay out
@@ -90,31 +99,31 @@ contract Presale {
      */
     function getAmountOutETH(uint256 amount) public view returns (uint256 tokensToReceive) {
             //if fund is less than 135 eth price1
-            require(PRICE > 0, "Price not set");
+            if(PRICE == 0) revert IMangoErrors.PriceNotSet();
             // Multiply first then divide for better precision
             tokensToReceive = (amount * 10**18) / PRICE;
     }
     function withdrawETH() external returns (uint256 balance) {
-        require(msg.sender == owner, 'Not owner');
+        if(msg.sender != owner) revert IMangoErrors.NotOwner();
         balance = address(this).balance;
         (bool success, ) = owner.call{value: balance}("");
-        require(success, "ETH transfer failed");
+        if(!success) revert IMangoErrors.ETHTransferFailed();
         emit EthWithdrawn(msg.sender, balance);
     }
     function withdrawTokens() external returns (uint256 balance) {
-        require(msg.sender == owner, 'Not owner');
+        if(msg.sender != owner) revert IMangoErrors.NotOwner();
         balance = IERC20(mango).balanceOf(address(this));
         bool s = IERC20(mango).transfer(owner, balance);
-        require(s, "Token transfer failed");
+        if(!s) revert IMangoErrors.TransferFailed();
     }
     function endPresale() external returns (bool) {
-        require(msg.sender == owner, 'Not owner');
+        if(msg.sender != owner) revert IMangoErrors.NotOwner();
         presaleEnded = true;
         return true;
     }
     function setPrice(uint256 newPrice) external {
-        require(msg.sender == owner, "Not owner");
-        require(newPrice > 0, "Price must be greater than zero");
+        if(msg.sender != owner) revert IMangoErrors.NotOwner();
+        if(newPrice == 0) revert IMangoErrors.InvalidPrice();
         PRICE = newPrice;
         emit PriceSet(PRICE);
     }
