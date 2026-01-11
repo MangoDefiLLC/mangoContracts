@@ -11,7 +11,6 @@ contract Presale {
     IMangoReferral public mangoReferral;
 
     IERC20 public immutable weth;
-    IERC20 public immutable usdc;
 
     bool public presaleEnded;
     uint256 public tokensSold; // Track how many tokens are sold
@@ -20,18 +19,25 @@ contract Presale {
    // Corrected prices in wei (1 ETH = $1800)
     uint256 public PRICE = 100_000_000_000 wei; // $0.00002 (7e9 wei)
 
-    event TokensPurchased(address indexed buyer, uint256 ethAmount, uint256 tokenAmount);
-    event EthWithdrawn(address caller, uint256 amount);
-    event Deposit(address sender, uint256 amount);
-    event PriceSet(uint256);
-    event ReferralPayout(uint256);
+    event TokensPurchased(address indexed buyer, uint256 indexed ethAmount, uint256 indexed tokenAmount);
+    event EthWithdrawn(address indexed caller, uint256 indexed amount);
+    event Deposit(address indexed sender, uint256 indexed amount);
+    event PriceSet(uint256 indexed price);
+    event ReferralPayout(uint256 indexed amount);
 
-    constructor() {
+    constructor(
+        address _mango,
+        address _weth,
+        address _mangoReferral
+    ) {
+        require(_mango != address(0), "Invalid mango address");
+        require(_weth != address(0), "Invalid weth address");
+        require(_mangoReferral != address(0), "Invalid referral address");
+        
         owner = msg.sender;
-        mango = 0xe3A7bd1f7F0bdEEce9DBb1230E64FFf26cd2C8b6;//MANGO sepolia depoye
-        weth = IERC20(0x4200000000000000000000000000000000000006);
-        //usdc = IERC20(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
-        mangoReferral = IMangoReferral(0xACAB329d683979C4650A7CfA20d8685Fcd0Cd08F);
+        mango = _mango;
+        weth = IERC20(_weth);
+        mangoReferral = IMangoReferral(_mangoReferral);
         presaleEnded = false;
     }
     
@@ -72,7 +78,9 @@ contract Presale {
     }
     function getAmountOutETH(uint256 amount) public view returns (uint256 tokensToReceive) {
             //if fund is less than 135 eth price1
-            tokensToReceive = amount / PRICE  * 10**18;
+            require(PRICE > 0, "Price not set");
+            // Multiply first then divide for better precision
+            tokensToReceive = (amount * 10**18) / PRICE;
     }
     function withdrawETH() external returns (uint256 balance) {
         require(msg.sender == owner, 'Not owner');
@@ -93,10 +101,9 @@ contract Presale {
         return true;
     }
     function setPrice(uint256 newPrice) external {
-        require(msg.sender == owner);
+        require(msg.sender == owner, "Not owner");
+        require(newPrice > 0, "Price must be greater than zero");
         PRICE = newPrice;
         emit PriceSet(PRICE);
     }
-
-   // fallback() external payable {}
 }

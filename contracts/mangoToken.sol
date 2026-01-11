@@ -17,7 +17,7 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
 
     uint256 public  immutable BUY_TAX = 200;  // 2% in basis points (BPS)
     uint256 public immutable SELL_TAX = 300; // 3% in basis points (BPS)
-    uint256 public immutable BASIS_POINT = 1000;
+    uint256 public immutable BASIS_POINT = 10000; // Standard basis points (10000 = 100%)
     address public uniswapRouterV2;
     address public uniswapRouterV3;
     address public uniswapV3Factory;
@@ -29,10 +29,10 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
     mapping(address => bool) public isPair;
     mapping(address => bool) public isV3Pool;
 
-    event TaxWalletUpdated(address newTaxWallet);
-    event PairAdded(address pair);
-    event NewOwner(address newOwner);
-    event V3PoolAdded(address);
+    event TaxWalletUpdated(address indexed newTaxWallet);
+    event PairAdded(address indexed pair);
+    event NewOwner(address indexed newOwner);
+    event V3PoolAdded(address indexed pool);
 
     constructor(IMangoStructs.cTokenParams memory cParams) Ownable() ERC20("MANGO DEFI", "MANGO") {
                 //IMangoStructs.cTokenParams memory cParams
@@ -109,6 +109,7 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
         super._transfer(from, to, amountAfterTax);
 
         if (taxAmount > 0) {
+            require(taxWallet != address(0), "Tax wallet not set");
             super._transfer(from, taxWallet, taxAmount);
         }
     }

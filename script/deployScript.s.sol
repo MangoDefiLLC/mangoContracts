@@ -166,7 +166,7 @@ contract Deploy_Script is Script {
         0x2626664c2603336E57B271c5C0b26F421741e481,//swapRouter02
         weth,//weth
         300,//taxFee
-        100//fererralFee
+        100//referralFee
         ): activeFork == keccak256(abi.encodePacked(BSC)) ? IMangoStructs.cParamsRouter(
             0xBCfCcbde45cE874adCB698cC183deBcF17952812,//factpryv2
             0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865,//factpry v3
@@ -174,7 +174,7 @@ contract Deploy_Script is Script {
             0x1b81D678ffb9C0263b24A97847620C99d213eB14,//swapRouter02
             weth,//weth
             300,//taxFee
-            100//fererralFee */
+            100//referralFee */
         ): IMangoStructs.cParamsRouter(
         //assume  arbitrum
         address(0),//factpryv2 
@@ -183,7 +183,7 @@ contract Deploy_Script is Script {
         0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45,//swapRouter02
         weth,//weth
         300,//taxFee
-        100//fererralFee
+        100//referralFee
         );
         
     }

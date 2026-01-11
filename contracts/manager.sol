@@ -7,7 +7,6 @@ import {IMangoStructs} from '../contracts/interfaces/IMangoStructs.sol';
 import { IMangoErrors } from '../contracts/interfaces/IMangoErrors.sol';
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import '@openzeppelin/contracts/access/Ownable.sol';
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 //THIS MODULE IS MENT TO MANAGE FEES FROM MANGO ROUTER AND TOKENS TAX
 //FUNCTIONS:
@@ -26,37 +25,50 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
     IMangoReferral public mangoReferral;
 
     //fees commming in have to be separates in to 3 vars
-    uint16 public teamFee;
-    uint16 public buyAndBurnFee;
-    uint16 public referralFee;
-    uint16 public constant BASIS_POINTS = 10000;
+    uint256 public teamFee;        // Can store up to 2^256 - 1
+    uint256 public buyAndBurnFee;  // Can store up to 2^256 - 1
+    uint256 public referralFee;    // Can store up to 2^256 - 1
     uint256 public totalFeesCollected;//slot 7
     uint256 public totalBurned;
 
 
-    event FeesReceived(uint256 totalAmount);
+    event FeesReceived(uint256 indexed totalAmount);
+    event TeamFeeWithdrawn(address indexed owner, uint256 indexed amount);
 
     constructor(
         IMangoStructs.cManagerParams memory params
         ) 
         Ownable(){
+        require(params.mangoRouter != address(0), "Invalid router");
+        require(params.mangoReferral != address(0), "Invalid referral");
+        require(params.token != address(0), "Invalid token");
+        
         mangoRouter = IMangoRouter(params.mangoRouter);
         mangoReferral = IMangoReferral(params.mangoReferral);
         mangoToken = MANGO_DEFI_TOKEN(params.token);
     }
 
+    /**
+     * @notice Burns MANGO tokens using accumulated buyAndBurnFee
+     * @dev Purchases MANGO tokens with ETH from buyAndBurnFee, then burns only the newly purchased tokens.
+     *      This ensures that any tokens accidentally sent to the contract are not burned.
+     * @param amount Amount of ETH (in wei) to use for purchasing and burning tokens
+     * @custom:security Only owner can call. Only burns tokens purchased in this transaction.
+     */
     function burn(uint256 amount) external {
-        //should i make this external?
-        //or only owner
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
         if(amount > buyAndBurnFee) revert IMangoErrors.AmountExceedsFee();
-        //burn amount of tokens aquired
-        uint256 amountToBurn = _buyMango(amount);
-     
-        //call the burn function in the erc20 token contract
-        mangoToken.burn(amountToBurn);
 
-        buyAndBurnFee -= uint16(amount);
+        // Track balance before purchase to only burn newly purchased tokens
+        uint256 balanceBefore = mangoToken.balanceOf(address(this));
+        _buyMango(amount);
+        uint256 balanceAfter = mangoToken.balanceOf(address(this));
+        uint256 purchasedAmount = balanceAfter - balanceBefore;
+        
+        // Only burn the tokens purchased in this transaction
+        mangoToken.burn(purchasedAmount);
+
+        buyAndBurnFee -= amount;
         totalBurned += amount;
     }
     function fundReferral(uint256 amount)external{
@@ -72,13 +84,13 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
     
         (bool s,) = address(mangoReferral).call(
             abi.encodeWithSignature(
-                "function depositeTokens(address token, uint256 amount)",
-            address(mangoToken),
-            amountOut
+                "depositeTokens(address,uint256)", // Fixed signature (no spaces, no 'function' keyword)
+                address(mangoToken),
+                amountOut
             )
         );
         if(!s) revert IMangoErrors.ReferralFundingFailed();
-        referralFee -= uint16(amount);
+        referralFee -= amount;
         //send Mango tokens to referral
         //call deposite on referral
     }
@@ -94,10 +106,12 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
 
     //of the amount comming in is the 3% fee wish is divided by 3 (1% each)
     function _setFees(uint256 amount) private {
-        uint16 fee = uint16((amount*BASIS_POINTS) / 3 / BASIS_POINTS);
-        teamFee = fee;
-        buyAndBurnFee = fee;
-        referralFee = fee;
+        uint256 fee = amount / 3; // Simple division
+        uint256 remainder = amount - (fee * 3); // Handle remainder
+        
+        teamFee += fee;
+        buyAndBurnFee += fee;
+        referralFee += (fee + remainder); // Give remainder to referral
         // // Final check
         //assert(teamFee + buyAndBurnFee + referralFee == amount);
     }
@@ -108,7 +122,13 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
     }
     function withdrawTeamFee(uint256 amount) external{
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
+        require(amount <= teamFee, "Amount exceeds available team fee");
+        require(address(this).balance >= amount, "Insufficient contract balance");
+        
+        teamFee -= amount;
         (bool s,) = msg.sender.call{value:amount}("");
         if(!s) revert IMangoErrors.WithdrawalFailed();
+        
+        emit TeamFeeWithdrawn(msg.sender, amount);
     }
 }

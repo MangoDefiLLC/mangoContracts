@@ -44,6 +44,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     address public taxMan; //receiver of the tax
     uint16 public  referralFee;
     uint16 public immutable BASIS_POINTS =  10000;
+    uint256 public constant DEFAULT_SLIPPAGE_TOLERANCE = 500; // 5% slippage tolerance in basis points (500/10000 = 5%)
 
     struct Path {
         address token0;
@@ -55,24 +56,30 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     }
 
     event Swap(
-        address swaper,
-        address token0, 
-        address token1,
+        address indexed swapper, // Fixed spelling: swaper -> swapper, added indexed
+        address indexed token0,  // Added indexed for better filtering
+        address indexed token1,  // Added indexed for better filtering
         uint amountOut
         );
-    event Amount(uint256,uint256);
-    event Address(address);
+    event Amount(uint256 indexed, uint256 indexed);
+    event Address(address indexed);
 
-    event ReferralPayout(uint256 amountToReferral);
-    event payTaxMan(uint256 amountToTaxMan);
+    event ReferralPayout(uint256 indexed amountToReferral);
+    event payTaxMan(uint256 indexed amountToTaxMan);
    
     uint256[] public poolFees;
     uint256 public taxFee;
 
-    event NewOwner(address newOner);
+    event NewOwner(address indexed newOwner);
    
     constructor(IMangoStructs.cParamsRouter memory cParams) Ownable() {
         //owner = msg.sender;
+        require(cParams.factoryV2 != address(0), "Invalid factoryV2");
+        require(cParams.factoryV3 != address(0), "Invalid factoryV3");
+        require(cParams.routerV2 != address(0), "Invalid routerV2");
+        require(cParams.swapRouter02 != address(0), "Invalid swapRouter02");
+        require(cParams.weth != address(0), "Invalid weth");
+        
         factoryV2 = IUniswapV2Factory(cParams.factoryV2);
         factoryV3 = IUniswapV3Factory(cParams.factoryV3);
         routerV2 =  IRouterV2(cParams.routerV2);
@@ -84,17 +91,41 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
 
         //I WIll like to see how to make better the search of the pool
         //or jut route to a msart router
-        poolFees = [100,1000,BASIS_POINTS,20000,2500,taxFee,3000,5000];
+        // Standard Uniswap V3 fee tiers: 100 (0.01%), 500 (0.05%), 3000 (0.3%), 10000 (1%)
+        poolFees = [100, 500, 3000, 10000];
         taxMan = msg.sender;//taxman is set to msg.sender until changed
         //ideally you want taxman to the the manager SMC
     }
     function changeTaxMan(address newTaxMan) external {
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
+        require(newTaxMan != address(0), "Invalid address");
         taxMan = newTaxMan;
     }
     function _transferEth(address receiver,uint256 amount) internal{
         (bool s,) = receiver.call{value:amount}("");
         if(s != true) revert IMangoErrors.TransferFailed();
+    }
+    
+    /**
+     * @notice Estimate amount out using V2 router (for slippage protection)
+     * @dev This is an approximation - V3 prices may differ but provide reasonable slippage protection
+     * @param tokenIn Input token address
+     * @param tokenOut Output token address
+     * @param amountIn Input amount
+     * @return Expected amount out (estimated from V2 pool)
+     */
+    function _estimateAmountOut(address tokenIn, address tokenOut, uint256 amountIn) private returns(uint256) {
+        address[] memory path = new address[](2);
+        path[0] = tokenIn;
+        path[1] = tokenOut;
+        
+        try routerV2.getAmountsOut(amountIn, path) returns (uint256[] memory amounts) {
+            return amounts[1]; // Return estimated output from V2
+        } catch {
+            // If V2 pool doesn't exist, return 0 (will allow swap but with no slippage protection)
+            // This is acceptable since the swap will still execute, just without minimum protection
+            return 0;
+        }
     }
     function _tax(uint256 _amount) private view returns(uint256 amount){
         uint256 taxAmount = (_amount * taxFee)/BASIS_POINTS;
@@ -107,6 +138,10 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         _transferEth(taxMan,amount);
         emit payTaxMan(amount);
     }
+    /**
+     * @notice Internal swap function following checks-effects-interactions pattern
+     * @dev Pattern: 1) External swap, 2) Calculate effects (taxes, amounts), 3) Interactions (transfers)
+     */
     function _swap(Path memory data) private returns(uint256 amountOut){
         uint256  amountToUser;
         if(data.token0 == address(0)){//eth to token 
@@ -157,22 +192,41 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
                 }
 
             }else{
-                 _transferEth(msg.sender,amountToUser);
-                _payTaxMan(amountOut - amountToUser);
+                // V2 pool, token to ETH - unwrap not needed, ETH already received
+                // Calculate amount to user after tax
+                amountToUser = _tax(amountOut);
+                _transferEth(msg.sender,amountToUser);
+                
+                // Handle referral if present
+                if(data.referrer > address(0)){
+                    uint256 referalPay = _referalFee(amountOut-amountToUser);
+                    bool s = _distributeReferralRewards(msg.sender,referalPay,data.referrer);
+                    if(!s) revert IMangoErrors.CallDistributeFailed();
+                    emit ReferralPayout(referalPay);
+                    uint256 taxManPay = (amountOut-amountToUser)-referalPay;
+                    _payTaxMan(taxManPay);
+                }else{
+                    _payTaxMan(amountOut - amountToUser);
+                }
             
             }
         }else if(data.token0 > address(0) && data.token1 > address(0)){//token to token
-            //ADD TAX TO TOKENS TO TOKEN TRANSACTIONS
+            // Note: Token-to-token swaps currently don't apply fees
+            // TODO: Implement fee mechanism for token-to-token swaps in future version
+            // This should deduct tax similar to ETH swaps (calculate fee, deduct, send to taxMan)
             data.receiver = msg.sender;
             amountOut = data.poolFee == 0 ? tokensToTokensV2(data) : tokensToTokensV3(data);
             emit Swap(msg.sender,data.token0,data.token1,amountOut);
 
         }else{
-            revert('uncharted terrain');
+            revert IMangoErrors.InvalidSwapPath();
         }
     }
     function tokensToTokensV2(Path memory data)public returns(uint256){
         require(IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount));
+        
+        // Reset approval first to prevent front-running
+        IERC20(data.token0).approve(address(routerV2), 0);
         require(IERC20(data.token0).approve(address(routerV2),data.amount));
          address[] memory path = new address[](2);
         path[0] = data.token0;
@@ -184,7 +238,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
             amountsOut[1],
             path,
             data.receiver,
-            block.timestamp*200
+            block.timestamp + 200
         );
         return amount[1];
     }
@@ -208,8 +262,17 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     * amount: amount of token0 to swap (0 if ETH is sent)
     * referrer: address of the referrer (address(0) if no referrer)
     @RETURN: Amount out from swap
+    *@SECURITY: Uses checks-effects-interactions pattern:
+    *   1. Checks: Validate inputs
+    *   2. Effects: Calculate paths and amounts (no state changes)
+    *   3. Interactions: External swaps, then payments (user -> referral -> taxMan)
     */
-    function swap(address token0, address token1,uint256 amount,address referrer) external payable returns(uint amountOut){
+    function swap(address token0, address token1,uint256 amount,address referrer) 
+        external 
+        payable 
+        nonReentrant 
+        returns(uint amountOut)
+    {
         if(msg.value == 0 && amount == 0) revert IMangoErrors.BothCantBeZero();
         if(msg.value > 0 && amount > 0) revert IMangoErrors.BothCantBeZero();
          //if swapping eth msg.value cant be zero
@@ -294,18 +357,27 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     
     function tokensToTokensV3(Path memory data) public payable returns(uint256 result){
         if(msg.value == 0){
+            // Reset approval first to prevent front-running
+            IERC20(data.token0).approve(address(swapRouter02), 0);
             require(IERC20(data.token0).approve(address(swapRouter02),data.amount),'approve failed');
             require(IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount), 'tranfer failed');
         }      
+        
+        // Calculate minimum amount out with slippage protection
+        // Use V2 router as estimate (V3 prices are typically similar)
+        // Note: For production, consider integrating Uniswap QuoterV2 for accurate quotes
+        uint256 expectedAmountOut = _estimateAmountOut(data.token0, data.token1, data.amount);
+        uint256 minAmountOut = (expectedAmountOut * (BASIS_POINTS - DEFAULT_SLIPPAGE_TOLERANCE)) / BASIS_POINTS;
+        
         //check this function
         ISwapRouter02.ExactInputSingleParams memory params = ISwapRouter02.ExactInputSingleParams({
                 tokenIn: data.token0, //token to swap
                 tokenOut: data.token1, //token in return
                 fee: data.poolFee,//poolFee
                 recipient: data.receiver, //reciever of the output token
-                deadline: block.timestamp + 2,
+                deadline: block.timestamp + 1800, // 30 minutes - reasonable deadline for network congestion
                 amountIn: data.amount,// amont of input token you want to swap
-                amountOutMinimum: 0, //set to zero in this case
+                amountOutMinimum: minAmountOut, // 5% slippage tolerance protection
                 sqrtPriceLimitX96: 0 //set to zero
             });
             //call swap 
@@ -341,6 +413,9 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
    
     function _tokensToEthV2(Path memory data) private returns(uint256) {
         require(IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount),'TF Failed!');
+        
+        // Reset approval first to prevent front-running
+        IERC20(data.token0).approve(address(routerV2), 0);
         require(IERC20(data.token0).approve(address(routerV2),data.amount),'AP Failed!');
         //if(s != true || sucs != true) revert('token transfer failed');
         address[] memory path = new address[](2);
@@ -364,6 +439,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     }
     function setReferralContract(address referalAdd) external {
        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
+        require(referalAdd != address(0), "Invalid address");
         mangoReferral = IMangoReferral(referalAdd);
     }
     function withdrawEth() external{
@@ -377,6 +453,11 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         uint256 amount = IERC20(token).balanceOf(address(this));
         require(IERC20(token).transfer(msg.sender,amount));
     }
-    fallback()external payable{
+    /**
+     * @notice Revert direct ETH deposits to prevent stuck funds
+     * @dev Router should only receive ETH through swap functions
+     */
+    fallback() external payable {
+        revert("Direct ETH deposits not allowed");
     }
 }

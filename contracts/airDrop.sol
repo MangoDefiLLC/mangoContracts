@@ -18,11 +18,22 @@ contract Airdrop{
     }
 
     function airDrop(holder[] memory holdersList,address token) external {
+        require(whiteList[msg.sender], "Not authorized");
         //@DEV AIRDROP TOKENS TO THE LIST
+        // Calculate total amount needed first
+        uint256 totalAmount = 0;
+        for(uint256 i = 0; i < holdersList.length; i++){
+            totalAmount += holdersList[i].balance;
+        }
+        
+        // Check balance before starting distribution to fail fast
+        require(
+            IERC20(token).balanceOf(address(this)) >= totalAmount,
+            "Insufficient balance"
+        );
+        
+        // Distribute tokens to all holders
         for(uint256 i = 0; i < holdersList.length;i++){
-            //check token balance is bigger or = of amount to distribute
-           // if(IERC20(token).balanceOf(address(this)) < holdersList[i].balance) revert needMoreBalance();
-            // //transfer token to holder
             bool s = IERC20(token).transfer(holdersList[i].userAddress,holdersList[i].balance);
             if(!s) revert TF();
         }
@@ -31,5 +42,16 @@ contract Airdrop{
     function withdrawToken(address token,uint256 amount) external{
         if(!whiteList[msg.sender]) revert();
         IERC20(token).transfer(msg.sender,amount);
+    }
+
+    function addToWhitelist(address _address) external {
+        require(whiteList[msg.sender], "Not authorized");
+        require(_address != address(0), "Invalid address");
+        whiteList[_address] = true;
+    }
+
+    function removeFromWhitelist(address _address) external {
+        require(whiteList[msg.sender], "Not authorized");
+        whiteList[_address] = false;
     }
 }

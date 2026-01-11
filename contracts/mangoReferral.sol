@@ -30,8 +30,8 @@ contract MangoReferral is Ownable{
     // Level 5: 10% (1000 basis points)
     uint256[5] public rewardPercentages = [4000, 2500, 1500, 1000, 1000];
    
-    event DistributedAmount(uint256);
-    event ReferralAdded(address evangelist,address beliver);
+    event DistributedAmount(uint256 indexed amount);
+    event ReferralAdded(address indexed evangelist, address indexed believer);
 
     struct ReferralReward {
         address referrerAddress;
@@ -42,6 +42,11 @@ contract MangoReferral is Ownable{
     //WARNING MANGO REFERRAL DOESNT GET PRICE FROM POOL
 
      constructor(IMangoStructs.cReferralParams memory params) Ownable(){//owner is dev wallet 
+         require(params.mangoRouter != address(0), "Invalid router");
+         require(params.mangoToken != address(0), "Invalid token");
+         require(params.routerV2 != address(0), "Invalid routerV2");
+         require(params.weth != address(0), "Invalid weth");
+         
          //0x49f2f071B1Ac90eD1DB1426EA01cA4C145c45d48;//
          whiteListed[params.mangoRouter] = true;//0x9E1672614377bBfdafADD61fB3Aa1897586D0903
          mangoToken = IERC20(params.mangoToken);//0xdAbF530587e25f8cB30813CABA0C3CB1DA4f83D4
@@ -60,8 +65,13 @@ contract MangoReferral is Ownable{
               address[] memory path = new address[](2);
                 path[0] = weth;
                 path[1] = address(mangoToken);
-                uint256[] memory amountOut = routerV2.getAmountsOut(amount,path);
-                mangoTokensAmount = amountOut[1];
+                
+                try routerV2.getAmountsOut(amount, path) returns (uint256[] memory amounts) {
+                    mangoTokensAmount = amounts[1];
+                } catch {
+                    // Fallback: Revert with clear error if pool doesn't exist or oracle fails
+                    revert("Price oracle unavailable - MANGO/WETH pool not found");
+                }
     }
     ///CREATE FUNCTION TO
     function distributeReferralRewards(
@@ -105,6 +115,11 @@ contract MangoReferral is Ownable{
         uint256 totalRewardsToDistribute = 0;
         uint8 chainLength = 0;
 
+        // Note: Circular referral chains (e.g., A→B→C→A) can exist in the referral system.
+        // We prevent duplicate rewards by checking if a referrer has already been processed
+        // in this distribution. Each referrer receives a reward only once per distribution,
+        // at the first level they appear in the chain, ensuring gas efficiency and fairness.
+
         // Current user to check for referrer
         address currentUser = userAddress;
 
@@ -116,6 +131,23 @@ contract MangoReferral is Ownable{
             // Break if no referrer found
             if (currentReferrer == address(0)) {
                 break;
+            }
+
+            // Prevent duplicate rewards: Check if this referrer has already been added to rewards
+            // This handles circular referral chains (e.g., A→B→C→A where A appears multiple times)
+            bool alreadyProcessed = false;
+            for (uint8 j = 0; j < chainLength; j++) {
+                if (rewards[j].referrerAddress == currentReferrer) {
+                    alreadyProcessed = true;
+                    break;
+                }
+            }
+
+            // Skip if this referrer has already been processed in this distribution
+            if (alreadyProcessed) {
+                // Move to next referrer but don't add duplicate reward
+                currentUser = currentReferrer;
+                continue;
             }
 
             // Calculate reward for this level (in basis points)
@@ -152,8 +184,11 @@ contract MangoReferral is Ownable{
                 mangoToken.transfer(reward.referrerAddress, reward.amount),
                 "Token transfer failed"
             );
-            emit DistributedAmount(totalRewardsToDistribute);
+            // Update lifetime earnings for this referrer
+            lifeTimeEarnings[reward.referrerAddress] += reward.amount;
         }
+        // Emit event once after all transfers complete
+        emit DistributedAmount(totalRewardsToDistribute);
         return rewards;
     }
     function withDrawTokens(address token,uint256 amount) external{
@@ -167,10 +202,12 @@ contract MangoReferral is Ownable{
     }
     function addToken(address token) external {
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
+        require(token != address(0), "Invalid token address");
         mangoToken = IERC20(token);
     }
     function addRouter(address router) external {
         if(msg.sender != owner()) revert IMangoErrors.NotOwner();
+        require(router != address(0), "Invalid router address");
         whiteListed[router] = true;
 
     }
@@ -182,8 +219,24 @@ contract MangoReferral is Ownable{
     //DEPENDING ON HOW.I GET THE DATA FROM EVENTS
     //MAKE IT A SPECIAL STRUCT TO ALL ALL AT ONCES
     function addReferralChain(address swapper, address referrer)external returns(bool){
-
+        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
+        require(swapper != address(0), "Invalid swapper address");
+        require(referrer != address(0), "Invalid referrer address");
+        require(swapper != referrer, "Cannot refer yourself");
+        require(
+            referralChain[swapper] == address(0), 
+            "Referral chain already exists"
+        );
+        
+        referralChain[swapper] = referrer;
+        emit ReferralAdded(referrer, swapper);
+        return true;
     }
-    receive()external payable{
+    /**
+     * @notice Revert direct ETH deposits - contract only uses MANGO tokens
+     * @dev ETH sent here can only be recovered by owner via ethWithdraw()
+     */
+    receive() external payable {
+        revert("ETH not accepted in referral contract");
     }
 }

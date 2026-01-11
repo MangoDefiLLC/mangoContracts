@@ -13,5 +13,6 @@ interface IMangoErrors{
     error AmountExceedsFee();
     error WithdrawalFailed();
     error ReferralFundingFailed();
+    error InvalidSwapPath();
     
 }
