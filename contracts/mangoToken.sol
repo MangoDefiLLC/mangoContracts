@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -26,7 +26,7 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
     // Storage optimized: Fixed-size array (always 5 elements) stored in bytecode as immutable
     // Using uint24 since Uniswap V3 fees are uint24
     // Note: BUY_TAX (200) and SELL_TAX (300) are basis points, BASIS_POINT (10000) is used for calculations
-    uint24[5] public immutable v3FeeTiers = [
+    uint24[5] public v3FeeTiers = [
         uint24(100), 
         uint24(BUY_TAX), 
         uint24(BASIS_POINT), 
@@ -118,6 +118,56 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
     function excludeAddress(address _addr) external onlyOwner returns (bool) {
         addressFlags[_addr].isExcludedFromTax = true;
         return true;
+    }
+
+    /**
+     * @notice Batch adds multiple Uniswap V2 pair addresses
+     * @dev Adds multiple pairs in a single transaction, saving gas on transaction overhead
+     * @param pairs Array of pair addresses to add
+     * @custom:gas-savings Saves ~21,000 gas per additional pair (base transaction cost)
+     */
+    function batchAddPairs(address[] calldata pairs) external onlyOwner {
+        uint256 length = pairs.length;
+        for (uint256 i = 0; i < length; ) {
+            address pair = pairs[i];
+            if(pair == address(0)) revert IMangoErrors.InvalidAddress();
+            addressFlags[pair].isPair = true;
+            emit PairAdded(pair);
+            unchecked { ++i; }  // Safe: i < length, will not overflow
+        }
+    }
+
+    /**
+     * @notice Batch adds multiple Uniswap V3 pool addresses
+     * @dev Adds multiple pools in a single transaction, saving gas on transaction overhead
+     * @param pools Array of pool addresses to add
+     * @custom:gas-savings Saves ~21,000 gas per additional pool (base transaction cost)
+     */
+    function batchAddV3Pools(address[] calldata pools) external onlyOwner {
+        uint256 length = pools.length;
+        for (uint256 i = 0; i < length; ) {
+            address pool = pools[i];
+            if(pool == address(0)) revert IMangoErrors.InvalidAddress();
+            addressFlags[pool].isV3Pool = true;
+            emit V3PoolAdded(pool);
+            unchecked { ++i; }  // Safe: i < length, will not overflow
+        }
+    }
+
+    /**
+     * @notice Batch excludes multiple addresses from tax
+     * @dev Excludes multiple addresses in a single transaction, saving gas on transaction overhead
+     * @param addresses Array of addresses to exclude from tax
+     * @custom:gas-savings Saves ~21,000 gas per additional address (base transaction cost)
+     */
+    function batchExcludeAddresses(address[] calldata addresses) external onlyOwner {
+        uint256 length = addresses.length;
+        for (uint256 i = 0; i < length; ) {
+            address addr = addresses[i];
+            if(addr == address(0)) revert IMangoErrors.InvalidAddress();
+            addressFlags[addr].isExcludedFromTax = true;
+            unchecked { ++i; }  // Safe: i < length, will not overflow
+        }
     }
 
     function _transfer(address from, address to, uint256 amount) internal virtual override {

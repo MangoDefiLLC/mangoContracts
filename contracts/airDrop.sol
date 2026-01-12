@@ -18,7 +18,16 @@ contract Airdrop{
         whiteList[msg.sender] = true;
     }
 
-    function airDrop(holder[] memory holdersList,address token) external {
+    /**
+     * @notice Distributes tokens to multiple holders in a single transaction
+     * @dev Optimized batch airdrop function. Uses calldata for array parameter to save gas.
+     *      Calculates total amount first, then checks balance before distribution to fail fast.
+     * @param holdersList Array of holder structs (address + balance)
+     * @param token Address of the token to distribute
+     * @custom:gas-savings Uses calldata instead of memory for array parameter (saves ~10-20 gas per item)
+     * @custom:security Only whitelisted addresses can call. Checks balance before distribution.
+     */
+    function airDrop(holder[] calldata holdersList,address token) external {
         if(!whiteList[msg.sender]) revert IMangoErrors.NotAuthorized();
         //@DEV AIRDROP TOKENS TO THE LIST
         // Optimized: Cache array length and token contract interface
@@ -45,7 +54,9 @@ contract Airdrop{
 
     function withdrawToken(address token,uint256 amount) external{
         if(!whiteList[msg.sender]) revert();
-        IERC20(token).transfer(msg.sender,amount);
+        // Optimized: Cache IERC20 interface to avoid repeated creation
+        IERC20 tokenContract = IERC20(token);
+        tokenContract.transfer(msg.sender,amount);
     }
 
     function addToWhitelist(address _address) external {

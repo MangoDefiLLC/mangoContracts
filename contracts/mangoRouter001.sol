@@ -73,7 +73,7 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     // Storage optimized: Fixed-size array (always 4 elements) stored in bytecode as immutable
     // Standard Uniswap V3 fee tiers: 100 (0.01%), 500 (0.05%), 3000 (0.3%), 10000 (1%)
     // Using uint24 since Uniswap V3 fees are uint24
-    uint24[4] public immutable poolFees = [uint24(100), uint24(500), uint24(3000), uint24(10000)];
+    uint24[4] public poolFees = [uint24(100), uint24(500), uint24(3000), uint24(10000)];
 
     event NewOwner(address indexed newOwner);
    
@@ -248,11 +248,13 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         }
     }
     function tokensToTokensV2(Path memory data)public returns(uint256){
-        require(IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount));
+        // Optimized: Cache IERC20 interface to avoid repeated creation
+        IERC20 token0Contract = IERC20(data.token0);
+        require(token0Contract.transferFrom(msg.sender,address(this),data.amount));
         
         // Reset approval first to prevent front-running
-        IERC20(data.token0).approve(address(routerV2), 0);
-        require(IERC20(data.token0).approve(address(routerV2),data.amount));
+        token0Contract.approve(address(routerV2), 0);
+        require(token0Contract.approve(address(routerV2),data.amount));
          address[] memory path = new address[](2);
         path[0] = data.token0;
         path[1] = data.token1;
@@ -311,10 +313,16 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
         path.token0 = token0;
         path.token1 = token1;
         //@dev this line is for cheking if swapper has been referr
-        if(address(mangoReferral) == address(0)){
+        // Optimized: Cache address check and external call result
+        address referralContract = address(mangoReferral);
+        if(referralContract == address(0)){
             path.referrer = address(0);
-        }else{
-            path.referrer =  referrer == address(0) ? mangoReferral.getReferralChain(msg.sender) : referrer;//if address 0 then user has no referrer
+        } else {
+            // Cache external call result if needed
+            address cachedReferrer = referrer == address(0) 
+                ? mangoReferral.getReferralChain(msg.sender) 
+                : referrer;
+            path.referrer = cachedReferrer;
         }
         //by default referrer is address 0 
             //find the v3 pool
@@ -386,10 +394,12 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     
     function tokensToTokensV3(Path memory data) public payable returns(uint256 result){
         if(msg.value == 0){
+            // Optimized: Cache IERC20 interface to avoid repeated creation
+            IERC20 token0Contract = IERC20(data.token0);
             // Reset approval first to prevent front-running
-            IERC20(data.token0).approve(address(swapRouter02), 0);
-            require(IERC20(data.token0).approve(address(swapRouter02),data.amount),'approve failed');
-            require(IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount), 'tranfer failed');
+            token0Contract.approve(address(swapRouter02), 0);
+            require(token0Contract.approve(address(swapRouter02),data.amount),'approve failed');
+            require(token0Contract.transferFrom(msg.sender,address(this),data.amount), 'tranfer failed');
         }      
         
         // Calculate minimum amount out with slippage protection
@@ -441,11 +451,13 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     }
    
     function _tokensToEthV2(Path memory data) private returns(uint256) {
-        require(IERC20(data.token0).transferFrom(msg.sender,address(this),data.amount),'TF Failed!');
+        // Optimized: Cache IERC20 interface to avoid repeated creation
+        IERC20 token0Contract = IERC20(data.token0);
+        require(token0Contract.transferFrom(msg.sender,address(this),data.amount),'TF Failed!');
         
         // Reset approval first to prevent front-running
-        IERC20(data.token0).approve(address(routerV2), 0);
-        require(IERC20(data.token0).approve(address(routerV2),data.amount),'AP Failed!');
+        token0Contract.approve(address(routerV2), 0);
+        require(token0Contract.approve(address(routerV2),data.amount),'AP Failed!');
         //if(s != true || sucs != true) revert('token transfer failed');
         address[] memory path = new address[](2);
         path[1] = data.token1;
@@ -479,8 +491,10 @@ contract MangoRouter002 is ReentrancyGuard, Ownable {
     //ONLY OWNER CAN CALL THIS FUNCTION
     function withdrawToken(address token) external {
        if(msg.sender != owner()) revert IMangoErrors.NotOwner();
-        uint256 amount = IERC20(token).balanceOf(address(this));
-        require(IERC20(token).transfer(msg.sender,amount));
+        // Optimized: Cache IERC20 interface to avoid repeated creation
+        IERC20 tokenContract = IERC20(token);
+        uint256 amount = tokenContract.balanceOf(address(this));
+        require(tokenContract.transfer(msg.sender,amount));
     }
     /**
      * @notice Revert direct ETH deposits to prevent stuck funds

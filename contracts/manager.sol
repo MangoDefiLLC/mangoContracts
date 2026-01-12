@@ -93,12 +93,15 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
         // if the referral has more tokens than the amount we just purchase
         // risk of sending all to referral
         //@dev: for ow this contract deals only with eth
+        // Optimized: Cache addresses to avoid repeated reads
+        address tokenAddress = address(mangoToken);
         uint256 amountOut = mangoToken.balanceOf(address(this));
+        address referralAddress = address(mangoReferral);
     
-        (bool s,) = address(mangoReferral).call(
+        (bool s,) = referralAddress.call(
             abi.encodeWithSignature(
                 "depositTokens(address,uint256)", // Fixed typo: depositeTokens -> depositTokens
-                address(mangoToken),
+                tokenAddress,
                 amountOut
             )
         );
@@ -113,8 +116,11 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
   
     function _buyMango(uint256 amount) private returns(uint256){
         //making a low level call to foward al gass fees
-        (bool s,bytes memory amountOut) = address(mangoRouter).call{value:amount}(
-            abi.encodeWithSignature("swap(address,address,uint256,address)",address(0),address(mangoToken),0,address(0))
+        // Optimized: Cache addresses to avoid repeated reads
+        address routerAddress = address(mangoRouter);
+        address tokenAddress = address(mangoToken);
+        (bool s,bytes memory amountOut) = routerAddress.call{value:amount}(
+            abi.encodeWithSignature("swap(address,address,uint256,address)",address(0),tokenAddress,0,address(0))
         );
         if(!s) revert IMangoErrors.SwapFailed();
         return abi.decode(amountOut,(uint256));

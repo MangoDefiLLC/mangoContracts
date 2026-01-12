@@ -1,5 +1,5 @@
 /// contracts/GLDToken.sol
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 //60000000000000000000000000000 60b
 import {IERC20} from "./interfaces/IERC20.sol";
@@ -44,7 +44,9 @@ contract Presale {
     
     function depositTokens(address token, uint256 amount) external {
         require(msg.sender == owner, 'Not owner');
-        bool txS = IERC20(token).transferFrom(msg.sender, address(this), amount);
+        // Optimized: Cache IERC20 interface to avoid repeated creation
+        IERC20 tokenContract = IERC20(token);
+        bool txS = tokenContract.transferFrom(msg.sender, address(this), amount);
         require(txS, 'Transfer failed');
     }
      function _tax(uint256 _amount) private pure returns(uint256 taxAmount){
@@ -80,7 +82,9 @@ contract Presale {
             tokensSold += tokensToReceive;
         }
         
-        if(!IERC20(mango).transfer(msg.sender, tokensToReceive)) revert IMangoErrors.TransferFailed();
+        // Optimized: Cache IERC20 interface to avoid repeated creation
+        IERC20 mangoToken = IERC20(mango);
+        if(!mangoToken.transfer(msg.sender, tokensToReceive)) revert IMangoErrors.TransferFailed();
         emit TokensPurchased(msg.sender, msg.value, tokensToReceive);
 
         //handle referral pay out
@@ -112,8 +116,11 @@ contract Presale {
     }
     function withdrawTokens() external returns (uint256 balance) {
         if(msg.sender != owner) revert IMangoErrors.NotOwner();
-        balance = IERC20(mango).balanceOf(address(this));
-        bool s = IERC20(mango).transfer(owner, balance);
+        // Optimized: Cache IERC20 interface and owner to avoid repeated calls
+        IERC20 mangoToken = IERC20(mango);
+        address contractOwner = owner;
+        balance = mangoToken.balanceOf(address(this));
+        bool s = mangoToken.transfer(contractOwner, balance);
         if(!s) revert IMangoErrors.TransferFailed();
     }
     function endPresale() external returns (bool) {

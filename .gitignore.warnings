@@ -1,0 +1,2 @@
+# Filter out forge-std warnings when viewing build output
+# Usage: forge build 2>&1 | grep -v "Warning (2424)"
