@@ -184,21 +184,25 @@ contract MANGO_DEFI_TOKEN is ERC20, Ownable, ERC20Burnable {
             bool isBuy = fromFlags.isPair || fromFlags.isV3Pool;
 
             if (isSell) {
-                // Sell transaction
+                // Sell transaction: 3% tax (300 basis points)
+                // Example: 100 MANGO -> 97 MANGO to Uniswap, 3 MANGO to tax wallet
                 taxAmount = (amount * SELL_TAX) / BASIS_POINT;
             } else if (isBuy) {
-                // Buy transaction
+                // Buy transaction: 2% tax (200 basis points)
+                // Example: 100 MANGO -> 98 MANGO to user, 2 MANGO to tax wallet
                 taxAmount = (amount * BUY_TAX) / BASIS_POINT;
             }
-
-            // SWAP 100 $MANGO -> UNISWAP 
-            //TX 100 MANGO -> 97 -> UNISWAP X REVERT
-        
         }
 
+        // Calculate amount after tax deduction
+        // For sells: 97% goes to Uniswap, 3% goes to tax wallet
+        // For buys: 98% goes to buyer, 2% goes to tax wallet
         uint256 amountAfterTax = amount - taxAmount;
+        
+        // Transfer the taxed amount to the recipient (Uniswap pool for sells, user for buys)
         super._transfer(from, to, amountAfterTax);
 
+        // Transfer the tax amount to the tax wallet
         if (taxAmount > 0) {
             if(taxWallet == address(0)) revert IMangoErrors.InvalidAddress();
             super._transfer(from, taxWallet, taxAmount);
