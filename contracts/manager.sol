@@ -33,7 +33,7 @@ contract Mango_Manager is Ownable, ReentrancyGuard {
     uint16 public referralFee;    // Storage packed - stores allocated amount, resets after funding
     uint256 public totalFeesCollected;// Stores complete accumulated value of all fees
     uint256 public totalBurned;
-
+    uint256 public constant BASIS_POINTS = 10000;
 
     event FeesReceived(uint256 indexed totalAmount);
     event TeamFeeWithdrawn(address indexed owner, uint256 indexed amount);
