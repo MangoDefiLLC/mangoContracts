@@ -32,9 +32,9 @@ contract MangoRouterTest is Test {
         
         // Deploy referral
         IMangoStructs.cReferralParams memory refParams = IMangoStructs.cReferralParams({
-            mangoRouter: IMangoRouter(address(0)), // Will be set after router deployment
+            mangoRouter: address(0), // Will be set after router deployment
             mangoToken: address(mockToken),
-            routerV2: IRouterV2(routerV2),
+            routerV2: routerV2,
             weth: address(mockWETH)
         });
         referral = new MangoReferral(refParams);

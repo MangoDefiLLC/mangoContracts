@@ -6,7 +6,6 @@ import {MANGO_DEFI_TOKEN} from "../contracts/mangoToken.sol";
 import {MangoRouter002} from "../contracts/mangoRouter001.sol";
 import {MangoReferral} from "../contracts/mangoReferral.sol";
 import {Mango_Manager} from "../contracts/manager.sol";
-import {Presale} from "../contracts/preSale.sol";
 import {Airdrop} from "../contracts/airDrop.sol";
 import {IMangoStructs} from "../contracts/interfaces/IMangoStructs.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -23,7 +22,7 @@ contract TestAllContracts is Script {
     MangoRouter002 public mangoRouter;
     MangoReferral public mangoReferral;
     Mango_Manager public manager;
-    Presale public presale;
+    // Presale contract removed from this repo; related tests were deleted
     Airdrop public airdrop;
 
     // Deployment addresses (will be set based on chain or provided via env)
@@ -83,17 +82,6 @@ contract TestAllContracts is Script {
         console.log("OK:  Manager deployed successfully");
         console.log("");
 
-        // Test 5: Deploy Presale
-        console.log("Test 5: Deploying Presale...");
-        testDeployPresale();
-        console.log("OK:  Presale deployed successfully");
-        console.log("");
-
-        // Test 6: Deploy Airdrop
-        console.log("Test 6: Deploying Airdrop...");
-        testDeployAirdrop();
-        console.log("OK:  Airdrop deployed successfully");
-        console.log("");
 
         // Test 7: Basic Functionality Tests
         console.log("Test 7: Testing Basic Functionality...");
@@ -117,7 +105,7 @@ contract TestAllContracts is Script {
         console.log("  Mango Router:", address(mangoRouter));
         console.log("  Mango Referral:", address(mangoReferral));
         console.log("  Manager:", address(manager));
-        console.log("  Presale:", address(presale));
+    // Presale removed
         console.log("  Airdrop:", address(airdrop));
     }
 
@@ -211,35 +199,6 @@ contract TestAllContracts is Script {
         console.log("  Referral:", address(manager.mangoReferral()));
     }
 
-    function testDeployPresale() internal {
-        presale = new Presale(
-            address(mangoToken),
-            weth,
-            address(mangoReferral)
-        );
-        
-        // Verify deployment
-        require(address(presale) != address(0), "Presale deployment failed");
-        require(presale.owner() == deployer, "Presale owner incorrect");
-        require(address(presale.mango()) == address(mangoToken), "Token address incorrect");
-        require(!presale.presaleEnded(), "Presale should not be ended");
-        
-        console.log("  Address:", address(presale));
-        console.log("  Owner:", presale.owner());
-        console.log("  Presale Ended:", presale.presaleEnded());
-    }
-
-    function testDeployAirdrop() internal {
-        airdrop = new Airdrop();
-        
-        // Verify deployment
-        require(address(airdrop) != address(0), "Airdrop deployment failed");
-        require(airdrop.whiteList(deployer), "Deployer should be whitelisted");
-        
-        console.log("  Address:", address(airdrop));
-        console.log("  Deployer Whitelisted:", airdrop.whiteList(deployer));
-    }
-
     function testBasicFunctionality() internal {
         // Test Mango Token functions
         console.log("  Testing Mango Token...");
@@ -269,14 +228,7 @@ contract TestAllContracts is Script {
         require(mangoReferral.getReferralChain(testUser) == deployer, "Referral chain not set");
         console.log("    OK:  Referral functions work");
 
-        // Test Presale functions
-        console.log("  Testing Presale...");
-        uint256 newPrice = 1e18;
-        presale.setPrice(newPrice);
-        require(presale.PRICE() == newPrice, "Price not set");
-        uint256 amountOut = presale.getAmountOutETH(1 ether);
-        require(amountOut > 0, "Amount out should be > 0");
-        console.log("    OK:  Presale functions work");
+    // Presale contract removed - skipping presale functional tests
 
         // Test Airdrop functions
         console.log("  Testing Airdrop...");
@@ -292,6 +244,7 @@ contract TestAllContracts is Script {
         
         // Test: Manager receives fees
         console.log("    Testing Manager fee receiving...");
+        // to add fee to manager just send eth
         uint256 feeAmount = 1 ether;
         (bool success, ) = address(manager).call{value: feeAmount}("");
         require(success, "Fee transfer failed");
@@ -309,10 +262,7 @@ contract TestAllContracts is Script {
         require(mangoToken.taxWallet() == address(manager), "Tax wallet not set");
         console.log("      OK:  Token-Manager integration correct");
 
-        // Test: Presale referral integration
-        console.log("    Testing Presale-Referral integration...");
-        require(address(presale.mangoReferral()) == address(mangoReferral), "Presale referral not set");
-        console.log("      OK:  Presale-Referral integration correct");
+    // Presale removed - skipping presale-referral integration test
     }
 }
 

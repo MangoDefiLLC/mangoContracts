@@ -51,13 +51,15 @@ contract Deploy_Script is Script {
     uint256 public baseFork;
     uint256 public sepoliaFork;
     IMangoStructs.cParamsRouter public params;
+    // USDC address for the active chain (can be overridden via env vars)
+    address public usdc;
     event Where(bool);    
 
     function setUp()external{
         cheatCodes = CheatCodes(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
         BASE = vm.envString("BASE_RPC");
         SEPOLIA = vm.envString("SEPOLIA_RPC");
-        TRON = vm.envString("TRON_RPC");
+       // TRON = vm.envString("TRON_RPC");
         BSC = vm.envString("BSC_RPC");
         ARBITRUM = vm.envString("ARBITRUM_RPC");
         // baseFork = vm.createFork(BASE);
@@ -74,8 +76,8 @@ contract Deploy_Script is Script {
     function run() public {
         vm.startBroadcast(pvk);
         //deployToken();//deployRouter();
-        setVariablesByChain(BSC);
-        deployRouter();
+        //setVariablesByChain(BSC);
+        //deployRouter();
         vm.stopBroadcast();
         
     }
@@ -158,7 +160,7 @@ contract Deploy_Script is Script {
                 activeFork == keccak256(abi.encodePacked(BSC)) ?  0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c:
                // activeFork == keccak256(abi.encodePacked(TRON)) ? TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8:
                 0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9;//assume sepolia
-        params =  activeFork == keccak256(abi.encodePacked(BASE)) ? IMangoStructs.cParamsRouter(
+    params =  activeFork == keccak256(abi.encodePacked(BASE)) ? IMangoStructs.cParamsRouter(
         //this is base 
         0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6,//factpryv2
         0x33128a8fC17869897dcE68Ed026d694621f6FDfD,//factpry v3
@@ -186,5 +188,26 @@ contract Deploy_Script is Script {
         100//referralFee
         );
         
+        // Prefer explicit env vars for USDC, but fall back to known addresses for common chains
+        // Provided defaults (can be overridden by env):
+        // BASE USDC: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+        // ARBITRUM USDC: 0xaf88d065e77c8cC2239327C5EDb3A432268e5831
+        // BSC USDC: 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56
+        if (activeFork == keccak256(abi.encodePacked(BASE))) {
+            usdc = vm.envOr("USDC_BASE", address(0));
+            if (usdc == address(0)) usdc = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+        } else if (activeFork == keccak256(abi.encodePacked(ARBITRUM))) {
+            usdc = vm.envOr("USDC_ARBITRUM", address(0));
+            if (usdc == address(0)) usdc = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
+        } else if (activeFork == keccak256(abi.encodePacked(BSC))) {
+            usdc = vm.envOr("USDC_BSC", address(0));
+            if (usdc == address(0)) usdc = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
+        } else if (activeFork == keccak256(abi.encodePacked(SEPOLIA))) {
+            usdc = vm.envOr("USDC_SEPOLIA", address(0));
+        } else if (activeFork == keccak256(abi.encodePacked(TRON))) {
+            usdc = vm.envOr("USDC_TRON", address(0));
+        } else {
+            usdc = address(0);
+        }
     }
 }
