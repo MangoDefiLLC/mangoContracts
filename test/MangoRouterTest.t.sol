@@ -30,16 +30,7 @@ contract MangoRouterTest is Test {
         mockWETH = new MockERC20("WETH", "WETH", 18);
         mockToken = new MockERC20("TestToken", "TEST", 18);
         
-        // Deploy referral
-        IMangoStructs.cReferralParams memory refParams = IMangoStructs.cReferralParams({
-            mangoRouter: IMangoRouter(address(0)), // Will be set after router deployment
-            mangoToken: address(mockToken),
-            routerV2: IRouterV2(routerV2),
-            weth: address(mockWETH)
-        });
-        referral = new MangoReferral(refParams);
-        
-        // Deploy router
+        // Deploy router first (needed for referral)
         IMangoStructs.cParamsRouter memory params = IMangoStructs.cParamsRouter({
             factoryV2: factoryV2,
             factoryV3: factoryV3,
@@ -51,6 +42,15 @@ contract MangoRouterTest is Test {
         });
         router = new MangoRouter002(params);
         router.changeTaxMan(taxMan);
+        
+        // Deploy referral with router address
+        IMangoStructs.cReferralParams memory refParams = IMangoStructs.cReferralParams({
+            mangoRouter: address(router),
+            mangoToken: address(mockToken),
+            routerV2: routerV2,
+            weth: address(mockWETH)
+        });
+        referral = new MangoReferral(refParams);
         
         vm.stopPrank();
     }
@@ -160,8 +160,11 @@ contract MangoRouterTest is Test {
 
     function test_Fallback_Revert_DirectETHDepositsNotAllowed() public {
         vm.expectRevert(IMangoErrors.DirectETHDepositsNotAllowed.selector);
+        // Call with empty calldata to trigger fallback()
         (bool success, ) = address(router).call{value: 1 ether}("");
-        require(!success, "Should have reverted");
+        // When expectRevert is used, the call will revert, so success will be false
+        // But we don't need to check it since expectRevert handles the assertion
+        (success); // Silence unused variable warning
     }
 
     // ============ Gas Benchmarks ============

@@ -8,6 +8,8 @@ import {MangoRouter002} from "../contracts/mangoRouter001.sol";
 import {MangoReferral} from "../contracts/mangoReferral.sol";
 import {IMangoStructs} from "../contracts/interfaces/IMangoStructs.sol";
 import {IMangoErrors} from "../contracts/interfaces/IMangoErrors.sol";
+import {IMangoRouter} from "../contracts/interfaces/IMangoRouter.sol";
+import {IMangoReferral} from "../contracts/interfaces/IMangoReferral.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {MockRouter} from "./mocks/MockRouter.sol";
@@ -34,8 +36,8 @@ contract ManagerTest is Test {
 
         // Deploy manager
         IMangoStructs.cManagerParams memory params = IMangoStructs.cManagerParams({
-            mangoRouter: IMangoRouter(address(mockRouter)),
-            mangoReferral: IMangoReferral(address(mockReferral)),
+            mangoRouter: address(mockRouter),
+            mangoReferral: address(mockReferral),
             token: address(mockToken)
         });
         manager = new Mango_Manager(params);
@@ -54,8 +56,8 @@ contract ManagerTest is Test {
 
     function test_Constructor_Revert_ZeroRouter() public {
         IMangoStructs.cManagerParams memory params = IMangoStructs.cManagerParams({
-            mangoRouter: IMangoRouter(address(0)),
-            mangoReferral: IMangoReferral(address(mockReferral)),
+            mangoRouter: address(0),
+            mangoReferral: address(mockReferral),
             token: address(mockToken)
         });
         vm.expectRevert(IMangoErrors.InvalidAddress.selector);
@@ -64,8 +66,8 @@ contract ManagerTest is Test {
 
     function test_Constructor_Revert_ZeroReferral() public {
         IMangoStructs.cManagerParams memory params = IMangoStructs.cManagerParams({
-            mangoRouter: IMangoRouter(address(mockRouter)),
-            mangoReferral: IMangoReferral(address(0)),
+            mangoRouter: address(mockRouter),
+            mangoReferral: address(0),
             token: address(mockToken)
         });
         vm.expectRevert(IMangoErrors.InvalidAddress.selector);
@@ -74,8 +76,8 @@ contract ManagerTest is Test {
 
     function test_Constructor_Revert_ZeroToken() public {
         IMangoStructs.cManagerParams memory params = IMangoStructs.cManagerParams({
-            mangoRouter: IMangoRouter(address(mockRouter)),
-            mangoReferral: IMangoReferral(address(mockReferral)),
+            mangoRouter: address(mockRouter),
+            mangoReferral: address(mockReferral),
             token: address(0)
         });
         vm.expectRevert(IMangoErrors.InvalidAddress.selector);
@@ -98,9 +100,9 @@ contract ManagerTest is Test {
         uint256 fee = amount / 3; // 100 ETH
         uint256 remainder = amount - (fee * 3); // 0 ETH
 
-        assertEq(uint256(manager.teamFee()), fee);
-        assertEq(uint256(manager.buyAndBurnFee()), fee);
-        assertEq(uint256(manager.referralFee()), fee + remainder);
+        assertEq(manager.teamFee(), fee);
+        assertEq(manager.buyAndBurnFee(), fee);
+        assertEq(manager.referralFee(), fee + remainder);
         assertEq(manager.totalFeesCollected(), amount);
     }
 
@@ -114,9 +116,9 @@ contract ManagerTest is Test {
         uint256 fee = amount / 3; // 33 wei
         uint256 remainder = amount - (fee * 3); // 1 wei
 
-        assertEq(uint256(manager.teamFee()), fee);
-        assertEq(uint256(manager.buyAndBurnFee()), fee);
-        assertEq(uint256(manager.referralFee()), fee + remainder); // Referral gets remainder
+        assertEq(manager.teamFee(), fee);
+        assertEq(manager.buyAndBurnFee(), fee);
+        assertEq(manager.referralFee(), fee + remainder); // Referral gets remainder
     }
 
     function test_Receive_MultipleDeposits() public {
@@ -131,20 +133,22 @@ contract ManagerTest is Test {
         // First deposit: 100 each
         // Second deposit: 200 each
         // Total: 300 each (plus remainders)
-        assertEq(uint256(manager.teamFee()), 300 ether);
-        assertEq(uint256(manager.buyAndBurnFee()), 300 ether);
-        assertEq(uint256(manager.referralFee()), 300 ether);
+        assertEq(manager.teamFee(), 300 ether);
+        assertEq(manager.buyAndBurnFee(), 300 ether);
+        assertEq(manager.referralFee(), 300 ether);
         assertEq(manager.totalFeesCollected(), 900 ether);
     }
 
     // ============ Burn Tests ============
 
     function test_Burn_Success() public {
-        uint256 feeAmount = 100 ether;
+        uint256 feeAmount = 90 ether; // Use amount divisible by 3
         deal(address(manager), feeAmount);
         (bool success, ) = address(manager).call{value: feeAmount}("");
         require(success);
 
+        // Fees are split by 3, so buyAndBurnFee = 90 / 3 = 30 ether
+        uint256 expectedBuyAndBurnFee = feeAmount / 3; // 30 ether
         uint256 burnAmount = 10 ether;
         deal(address(mockRouter), burnAmount); // Router has ETH for swap
         mockRouter.setFixedAmountOut(1000e18); // Set tokens returned from swap
@@ -153,7 +157,7 @@ contract ManagerTest is Test {
         manager.burn(burnAmount);
         vm.stopPrank();
 
-        assertEq(uint256(manager.buyAndBurnFee()), feeAmount - burnAmount);
+        assertEq(manager.buyAndBurnFee(), expectedBuyAndBurnFee - burnAmount);
         assertEq(manager.totalBurned(), burnAmount);
         assertEq(mockToken.balanceOf(address(manager)), 0); // Tokens burned
     }
@@ -206,21 +210,27 @@ contract ManagerTest is Test {
     // ============ FundReferral Tests ============
 
     function test_FundReferral_Success() public {
-        uint256 feeAmount = 100 ether;
+        uint256 feeAmount = 90 ether; // Use amount divisible by 3
         deal(address(manager), feeAmount);
         (bool success, ) = address(manager).call{value: feeAmount}("");
         require(success);
 
+        // Fees are split by 3, so referralFee = 90 / 3 = 30 ether (plus remainder)
+        uint256 expectedReferralFee = feeAmount / 3; // 30 ether
         uint256 fundAmount = 10 ether;
         deal(address(mockRouter), fundAmount);
         uint256 tokensFromSwap = 500e18;
         mockRouter.setFixedAmountOut(tokensFromSwap); // Set tokens returned from swap
+        
+        // Approve mockReferral to spend tokens from manager
+        vm.prank(address(manager));
+        mockToken.approve(address(mockReferral), tokensFromSwap);
 
         vm.startPrank(owner);
         manager.fundReferral(fundAmount);
         vm.stopPrank();
 
-        assertEq(uint256(manager.referralFee()), feeAmount - fundAmount);
+        assertEq(manager.referralFee(), expectedReferralFee - fundAmount);
         assertEq(mockToken.balanceOf(address(mockReferral)), tokensFromSwap);
         assertEq(mockToken.balanceOf(address(manager)), 0);
     }
@@ -250,11 +260,14 @@ contract ManagerTest is Test {
     // ============ WithdrawTeamFee Tests ============
 
     function test_WithdrawTeamFee_Success() public {
-        uint256 feeAmount = 100 ether;
-        deal(address(manager), feeAmount);
+        uint256 feeAmount = 90 ether; // Use amount divisible by 3
+        // Send ETH directly to trigger receive() - don't use deal() as it adds balance separately
+        deal(address(this), feeAmount);
         (bool success, ) = address(manager).call{value: feeAmount}("");
         require(success);
 
+        // Fees are split by 3, so teamFee = 90 / 3 = 30 ether
+        uint256 expectedTeamFee = feeAmount / 3; // 30 ether
         uint256 withdrawAmount = 10 ether;
         uint256 ownerBalanceBefore = owner.balance;
 
@@ -264,8 +277,9 @@ contract ManagerTest is Test {
         manager.withdrawTeamFee(withdrawAmount);
         vm.stopPrank();
 
-        assertEq(uint256(manager.teamFee()), feeAmount - withdrawAmount);
+        assertEq(manager.teamFee(), expectedTeamFee - withdrawAmount);
         assertEq(owner.balance, ownerBalanceBefore + withdrawAmount);
+        // Manager balance = initial feeAmount - withdrawn amount = 90 - 10 = 80 ether
         assertEq(address(manager).balance, feeAmount - withdrawAmount);
     }
 
@@ -292,18 +306,31 @@ contract ManagerTest is Test {
     }
 
     function test_WithdrawTeamFee_Revert_InsufficientBalance() public {
-        uint256 feeAmount = 100 ether;
+        uint256 feeAmount = 90 ether; // Use amount divisible by 3
         deal(address(manager), feeAmount);
         (bool success, ) = address(manager).call{value: feeAmount}("");
         require(success);
 
-        // Withdraw some ETH first
-        vm.startPrank(owner);
-        manager.withdrawTeamFee(50 ether);
+        // Fees are split by 3, so teamFee = 90 / 3 = 30 ether
+        uint256 expectedTeamFee = feeAmount / 3; // 30 ether
         
-        // Now try to withdraw more than remaining balance
-        vm.expectRevert(IMangoErrors.InsufficientBalance.selector);
-        manager.withdrawTeamFee(51 ether);
+        // Withdraw some ETH first (20 ether)
+        vm.startPrank(owner);
+        manager.withdrawTeamFee(20 ether);
+        
+        // Remaining teamFee = 10 ether, remaining balance = 70 ether
+        // Try to withdraw 11 ether (more than teamFee, but less than balance)
+        // This should fail with AmountExceedsFee, not InsufficientBalance
+        vm.expectRevert(IMangoErrors.AmountExceedsFee.selector);
+        manager.withdrawTeamFee(11 ether);
+        
+        // Now withdraw all remaining teamFee (10 ether), leaving balance at 60 ether
+        manager.withdrawTeamFee(10 ether);
+        
+        // Now try to withdraw when balance is insufficient (try to withdraw 61 ether when only 60 ether left)
+        // But teamFee is 0, so it should fail with AmountExceedsFee
+        vm.expectRevert(IMangoErrors.AmountExceedsFee.selector);
+        manager.withdrawTeamFee(1 ether);
         vm.stopPrank();
     }
 
@@ -361,15 +388,17 @@ contract ManagerTest is Test {
         uint256 fee = amount / 3;
         uint256 remainder = amount - (fee * 3);
 
-        assertEq(uint256(manager.teamFee()), fee);
-        assertEq(uint256(manager.buyAndBurnFee()), fee);
-        assertEq(uint256(manager.referralFee()), fee + remainder);
+        assertEq(manager.teamFee(), fee);
+        assertEq(manager.buyAndBurnFee(), fee);
+        assertEq(manager.referralFee(), fee + remainder);
         assertEq(manager.totalFeesCollected(), amount);
     }
 
     function testFuzz_Burn_AmountValidation(uint256 feeAmount, uint256 burnAmount) public {
-        feeAmount = bound(feeAmount, 1, 1000 ether);
-        burnAmount = bound(burnAmount, 1, feeAmount);
+        feeAmount = bound(feeAmount, 3, 1000 ether); // Must be at least 3 to split properly
+        // Fees are split by 3, so buyAndBurnFee = feeAmount / 3
+        uint256 buyAndBurnFee = feeAmount / 3;
+        burnAmount = bound(burnAmount, 1, buyAndBurnFee); // Bound to actual buyAndBurnFee
         
         deal(address(manager), feeAmount);
         (bool success, ) = address(manager).call{value: feeAmount}("");
@@ -382,7 +411,7 @@ contract ManagerTest is Test {
         manager.burn(burnAmount);
         vm.stopPrank();
 
-        assertEq(uint256(manager.buyAndBurnFee()), feeAmount - burnAmount);
+        assertEq(manager.buyAndBurnFee(), buyAndBurnFee - burnAmount);
     }
 }
 

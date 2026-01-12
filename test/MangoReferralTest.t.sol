@@ -47,9 +47,9 @@ contract MangoReferralTest is Test {
         
         // Deploy referral contract
         IMangoStructs.cReferralParams memory params = IMangoStructs.cReferralParams({
-            mangoRouter: IMangoRouter(address(mockRouter)),
+            mangoRouter: address(mockRouter),
             mangoToken: address(mangoToken),
-            routerV2: IRouterV2(routerV2),
+            routerV2: routerV2,
             weth: address(mockWETH)
         });
         referral = new MangoReferral(params);
@@ -67,9 +67,9 @@ contract MangoReferralTest is Test {
 
     function test_Constructor_Revert_ZeroRouter() public {
         IMangoStructs.cReferralParams memory params = IMangoStructs.cReferralParams({
-            mangoRouter: IMangoRouter(address(0)),
+            mangoRouter: address(0),
             mangoToken: address(mangoToken),
-            routerV2: IRouterV2(routerV2),
+            routerV2: routerV2,
             weth: address(mockWETH)
         });
         vm.expectRevert(IMangoErrors.InvalidAddress.selector);
@@ -78,9 +78,9 @@ contract MangoReferralTest is Test {
 
     function test_Constructor_Revert_ZeroToken() public {
         IMangoStructs.cReferralParams memory params = IMangoStructs.cReferralParams({
-            mangoRouter: IMangoRouter(address(mockRouter)),
+            mangoRouter: address(mockRouter),
             mangoToken: address(0),
-            routerV2: IRouterV2(routerV2),
+            routerV2: routerV2,
             weth: address(mockWETH)
         });
         vm.expectRevert(IMangoErrors.InvalidAddress.selector);
@@ -129,7 +129,7 @@ contract MangoReferralTest is Test {
     function test_AddReferralChain_Revert_AlreadyExists() public {
         vm.startPrank(owner);
         referral.addReferralChain(user1, referrer1);
-        vm.expectRevert(IMangoErrors.ReferralChainAlreadyExists.selector);
+        vm.expectRevert("Referral chain already exists");
         referral.addReferralChain(user1, referrer2);
         vm.stopPrank();
     }
@@ -290,7 +290,9 @@ contract MangoReferralTest is Test {
     function test_Receive_Revert_ETHNotAccepted() public {
         vm.expectRevert(IMangoErrors.ETHNotAccepted.selector);
         (bool success, ) = address(referral).call{value: 1 ether}("");
-        require(!success, "Should have reverted");
+        // Note: When expectRevert is used, the call will revert, so success will be false
+        // But we don't need to check it since expectRevert handles the assertion
+        (success); // Silence unused variable warning
     }
 
     // ============ GetReferralChain Tests ============
